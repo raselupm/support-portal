@@ -11,7 +11,7 @@
 
   // Inject spin keyframes
   var styleEl = document.createElement('style');
-  styleEl.textContent = '@keyframes sp-spin { to { transform: rotate(360deg); } } @keyframes sp-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }';
+  styleEl.textContent = '@keyframes sp-spin { to { transform: rotate(360deg); } } @keyframes sp-pulse { 0%,100%{opacity:1} 50%{opacity:.5} } @keyframes sp-bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-4px)} }';
   document.head.appendChild(styleEl);
 
   // Colors
@@ -542,7 +542,48 @@
       });
     }
 
+    // Typing indicator row (above input)
+    var typingRow = el('div', {
+      padding: '0 16px 6px', display: 'none', alignItems: 'center', gap: '6px', flexShrink: '0',
+    });
+    var typingText = el('span', { fontSize: '11px', color: C.textSecondary });
+    var typingDots = el('span', { display: 'inline-flex', gap: '2px', alignItems: 'center' });
+    for (var di = 0; di < 3; di++) {
+      var dot = el('span', {
+        width: '4px', height: '4px', borderRadius: '50%', background: C.textSecondary,
+        display: 'inline-block',
+        animation: 'sp-bounce 1.2s ease-in-out ' + (di * 0.2) + 's infinite',
+      });
+      typingDots.appendChild(dot);
+    }
+    typingRow.appendChild(typingText);
+    typingRow.appendChild(typingDots);
+
+    var _typingClearTimer = null;
+    function showTyping(name) {
+      typingText.textContent = name + ' is typing';
+      typingRow.style.display = 'flex';
+      if (_typingClearTimer) clearTimeout(_typingClearTimer);
+      _typingClearTimer = setTimeout(function () {
+        typingRow.style.display = 'none';
+      }, 3000);
+    }
+
+    // Send typing event (throttled to once per 2s)
+    var _lastTypingSent = 0;
+    function sendTypingEvent() {
+      var now = Date.now();
+      if (now - _lastTypingSent < 2000) return;
+      _lastTypingSent = now;
+      fetch(PORTAL_URL + '/api/chat/' + state.chatId + '/typing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: state.token }),
+      }).catch(function () {});
+    }
+
     sendBtn.addEventListener('click', doSend);
+    textInput.addEventListener('input', sendTypingEvent);
     textInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
     });
@@ -550,13 +591,15 @@
     inputRow.appendChild(textInput);
     inputRow.appendChild(sendBtn);
     winBody.appendChild(msgList);
+    winBody.appendChild(typingRow);
     winBody.appendChild(inputRow);
 
     msgList.scrollTop = msgList.scrollHeight;
 
-    // Expose msgList and appendMessage for polling
+    // Expose msgList, appendMessage and showTyping for Pusher
     state._msgList = msgList;
     state._appendMessage = appendMessage;
+    state._showTyping = showTyping;
 
     setTimeout(function () { textInput.focus(); }, 50);
   }
@@ -847,6 +890,13 @@
         if ((msg.sender === 'staff' || msg.sender === 'system') && !document.hasFocus()) {
           playNotificationSound();
           startTitleBlink();
+        }
+      });
+
+      state.pusherChannel.bind('typing', function (data) {
+        if (data.sender !== 'staff') return;
+        if (state.step === 'active' && state.open && state._showTyping) {
+          state._showTyping(data.name);
         }
       });
 

@@ -114,7 +114,11 @@ export default function StaffChatWindow({
   const [sending, setSending] = useState(false)
   const [joining, setJoining] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [visitorTyping, setVisitorTyping] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTypingSentRef = useRef<number>(0)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -158,10 +162,18 @@ export default function StaffChatWindow({
       }))
     })
 
+    channel.bind('typing', (data: { name: string; sender: 'visitor' | 'staff' }) => {
+      if (data.sender !== 'visitor') return
+      setVisitorTyping(data.name)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = setTimeout(() => setVisitorTyping(null), 3000)
+    })
+
     return () => {
       channel.unbind_all()
       pusher.unsubscribe(`chat-${initialChat.id}`)
       pusher.disconnect()
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     }
   }, [initialChat.id])
 
@@ -238,6 +250,13 @@ export default function StaffChatWindow({
       setSending(false)
     }
   }
+
+  const sendTyping = useCallback(() => {
+    const now = Date.now()
+    if (now - lastTypingSentRef.current < 2000) return
+    lastTypingSentRef.current = now
+    fetch(`/api/chat/${chat.id}/typing`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+  }, [chat.id])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -357,6 +376,19 @@ export default function StaffChatWindow({
             </div>
           )}
 
+          {visitorTyping && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 rounded-2xl rounded-tl-sm">
+                <span className="text-xs text-gray-500">{visitorTyping} is typing</span>
+                <span className="flex gap-0.5 items-center">
+                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1 h-1 rounded-full bg-gray-400 animate-bounce [animation-delay:300ms]" />
+                </span>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
@@ -387,7 +419,7 @@ export default function StaffChatWindow({
             <div className="flex gap-2">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); sendTyping() }}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message... (Enter to send)"
                 rows={2}
