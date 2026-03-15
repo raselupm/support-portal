@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, ArrowRight, Loader2 } from 'lucide-react'
+import Script from 'next/script'
 
 declare global {
   interface Window {
@@ -166,6 +167,11 @@ export default function LoginPage() {
           </form>
         </div>
       </div>
+      <Script
+        src={`${process.env.NEXT_PUBLIC_APP_URL}/chat-widget.js`}
+        data-portal-url={process.env.NEXT_PUBLIC_APP_URL}
+        strategy="lazyOnload"
+      />
     </div>
   )
 }
