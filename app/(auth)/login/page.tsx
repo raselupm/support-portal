@@ -30,12 +30,12 @@ export default function LoginPage() {
     if (!siteKey) return
 
     const renderWidget = () => {
-      if (recaptchaRef.current && widgetIdRef.current === null && window.grecaptcha?.render) {
+      if (recaptchaRef.current && widgetIdRef.current === null && typeof window.grecaptcha !== 'undefined') {
         widgetIdRef.current = window.grecaptcha.render(recaptchaRef.current, { sitekey: siteKey })
       }
     }
 
-    if (window.grecaptcha?.render) {
+    if (typeof window.grecaptcha !== 'undefined') {
       renderWidget()
     } else {
       window.onRecaptchaLoad = renderWidget
