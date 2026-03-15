@@ -9,6 +9,7 @@ import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
 import CommentItem from '@/components/comment-item'
 import CommentForm from './comment-form'
+import DeleteTicketButton from './delete-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -151,6 +152,12 @@ export default async function TicketDetailPage({ params }: PageProps) {
                 <dd className="text-xs text-gray-400 font-mono">{ticket.id}</dd>
               </div>
             </dl>
+
+            {admin && (
+              <div className="mt-5 pt-4 border-t border-gray-100">
+                <DeleteTicketButton ticketId={ticket.id} />
+              </div>
+            )}
           </div>
         </div>
       </div>
