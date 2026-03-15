@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Ticket, StaffMember } from '@/lib/types'
+import { Ticket, StaffMember, Chat } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
-import { TicketIcon, MessageSquare, CheckCircle, LayoutDashboard } from 'lucide-react'
+import { TicketIcon, MessageSquare, CheckCircle, LayoutDashboard, MessagesSquare, Clock, ActivitySquare, XCircle } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
 import WeeklyChart from './weekly-chart'
@@ -101,6 +101,28 @@ export default async function DashboardPage() {
     if (ticket) recentTickets.push(ticket)
   }
 
+  // 5. Chat counts by status
+  const allChatIds = (await redis.zrange('chats', 0, -1)) as string[]
+  const chatCounts = { total: 0, waiting: 0, active: 0, closed: 0 }
+  const recentChats: Chat[] = []
+
+  for (const id of allChatIds) {
+    const chat = await redis.get<Chat>(`chat:${id}`)
+    if (chat) {
+      chatCounts.total++
+      if (chat.status === 'waiting') chatCounts.waiting++
+      else if (chat.status === 'active') chatCounts.active++
+      else if (chat.status === 'closed') chatCounts.closed++
+    }
+  }
+
+  // Recent 5 chats (newest first)
+  const recentChatIds = (await redis.zrange('chats', 0, 4, { rev: true })) as string[]
+  for (const id of recentChatIds) {
+    const chat = await redis.get<Chat>(`chat:${id}`)
+    if (chat) recentChats.push(chat)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -108,32 +130,66 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Tickets"
-          value={counts.total}
-          icon={<TicketIcon className="w-5 h-5 text-gray-600" />}
-          colorClass="bg-gray-100"
-        />
-        <StatCard
-          label="Open"
-          value={counts.open}
-          icon={<TicketIcon className="w-5 h-5 text-blue-600" />}
-          colorClass="bg-blue-50"
-        />
-        <StatCard
-          label="Customer Reply"
-          value={counts.customer_reply}
-          icon={<MessageSquare className="w-5 h-5 text-amber-600" />}
-          colorClass="bg-amber-50"
-        />
-        <StatCard
-          label="Replied"
-          value={counts.replied}
-          icon={<CheckCircle className="w-5 h-5 text-green-600" />}
-          colorClass="bg-green-50"
-        />
+      {/* Ticket stat cards */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Tickets</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Tickets"
+            value={counts.total}
+            icon={<TicketIcon className="w-5 h-5 text-gray-600" />}
+            colorClass="bg-gray-100"
+          />
+          <StatCard
+            label="Open"
+            value={counts.open}
+            icon={<TicketIcon className="w-5 h-5 text-blue-600" />}
+            colorClass="bg-blue-50"
+          />
+          <StatCard
+            label="Customer Reply"
+            value={counts.customer_reply}
+            icon={<MessageSquare className="w-5 h-5 text-amber-600" />}
+            colorClass="bg-amber-50"
+          />
+          <StatCard
+            label="Replied"
+            value={counts.replied}
+            icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+            colorClass="bg-green-50"
+          />
+        </div>
+      </div>
+
+      {/* Chat stat cards */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Live Chats</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Total Chats"
+            value={chatCounts.total}
+            icon={<MessagesSquare className="w-5 h-5 text-gray-600" />}
+            colorClass="bg-gray-100"
+          />
+          <StatCard
+            label="Waiting"
+            value={chatCounts.waiting}
+            icon={<Clock className="w-5 h-5 text-orange-600" />}
+            colorClass="bg-orange-50"
+          />
+          <StatCard
+            label="Active"
+            value={chatCounts.active}
+            icon={<ActivitySquare className="w-5 h-5 text-green-600" />}
+            colorClass="bg-green-50"
+          />
+          <StatCard
+            label="Closed"
+            value={chatCounts.closed}
+            icon={<XCircle className="w-5 h-5 text-gray-400" />}
+            colorClass="bg-gray-50"
+          />
+        </div>
       </div>
 
       {/* Charts row */}
@@ -174,6 +230,48 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Recent chats */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-700">Recent Chats</h2>
+          <Link href="/admin/chats" className="text-xs text-blue-600 hover:underline">View all</Link>
+        </div>
+        {recentChats.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No chats yet.</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {recentChats.map((chat) => (
+              <div key={chat.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/admin/chats/${chat.id}`}
+                    className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors block truncate"
+                  >
+                    {chat.visitorName || chat.visitorEmail}
+                  </Link>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-400 truncate">{chat.visitorEmail}</span>
+                    <span className="text-xs text-gray-300">·</span>
+                    <span className="text-xs text-gray-400">
+                      {formatDistanceToNow(new Date(chat.createdAt), { addSuffix: true })}
+                    </span>
+                  </div>
+                </div>
+                <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  chat.status === 'waiting'
+                    ? 'bg-orange-100 text-orange-700'
+                    : chat.status === 'active'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {chat.status === 'waiting' ? 'Waiting' : chat.status === 'active' ? 'Active' : 'Closed'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Staff performance table */}
