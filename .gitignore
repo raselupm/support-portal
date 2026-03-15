@@ -1,0 +1,4 @@
+.claude
+.next
+node_modules
+.env.local

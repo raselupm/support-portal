@@ -1,0 +1,159 @@
+import { redirect, notFound } from 'next/navigation'
+import { getSession } from '@/lib/session'
+import { isAdmin } from '@/lib/auth'
+import { redis } from '@/lib/redis'
+import { Ticket, Comment } from '@/lib/types'
+import { formatDistanceToNow } from 'date-fns'
+import { ArrowLeft, User } from 'lucide-react'
+import Link from 'next/link'
+import StatusBadge from '@/components/status-badge'
+import CommentItem from '@/components/comment-item'
+import CommentForm from './comment-form'
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+async function getTicketData(id: string) {
+  const ticket = await redis.get<Ticket>(`ticket:${id}`)
+  if (!ticket) return null
+
+  const rawComments = await redis.lrange(`ticket_comments:${id}`, 0, -1)
+  const comments: Comment[] = rawComments
+    .map((c) => {
+      if (typeof c === 'string') {
+        try {
+          return JSON.parse(c) as Comment
+        } catch {
+          return null
+        }
+      }
+      return c as Comment
+    })
+    .filter((c): c is Comment => c !== null)
+
+  return { ticket, comments }
+}
+
+export default async function TicketDetailPage({ params }: PageProps) {
+  const { id } = await params
+  const session = await getSession()
+  if (!session.email) redirect('/login')
+
+  const data = await getTicketData(id)
+  if (!data) notFound()
+
+  const { ticket, comments } = data
+  const admin = isAdmin(session.email)
+
+  // Customers can only see their own tickets
+  if (!admin && ticket.userEmail !== session.email) {
+    notFound()
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link
+          href="/tickets"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to tickets
+        </Link>
+        <h1 className="text-xl font-bold text-gray-900 leading-tight">{ticket.title}</h1>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content */}
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* Description */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <User className="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div>
+                <span className="text-sm font-medium text-gray-700">{ticket.userEmail}</span>
+                <span className="text-xs text-gray-400 ml-2">
+                  {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                </span>
+              </div>
+            </div>
+            <div
+              className="prose prose-sm max-w-none text-gray-700"
+              dangerouslySetInnerHTML={{ __html: ticket.description }}
+            />
+          </div>
+
+          {/* Comments */}
+          {comments.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Replies ({comments.length})
+              </h2>
+              {comments.map((comment) => (
+                <CommentItem key={comment.id} comment={comment} />
+              ))}
+            </div>
+          )}
+
+          {/* Comment Form */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">
+              {comments.length === 0 ? 'Add a Reply' : 'Reply'}
+            </h2>
+            <CommentForm ticketId={ticket.id} />
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="lg:w-72 flex-shrink-0">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 lg:sticky lg:top-22">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">Ticket Information</h2>
+
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</dt>
+                <dd>
+                  <StatusBadge status={ticket.status} />
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Product</dt>
+                <dd className="text-sm text-gray-700">{ticket.product}</dd>
+              </div>
+
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Created</dt>
+                <dd className="text-sm text-gray-700">
+                  {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                </dd>
+              </div>
+
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Last Updated</dt>
+                <dd className="text-sm text-gray-700">
+                  {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
+                </dd>
+              </div>
+
+              {admin && ticket.userEmail !== session.email && (
+                <div>
+                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Customer</dt>
+                  <dd className="text-sm text-gray-700 break-all">{ticket.userEmail}</dd>
+                </div>
+              )}
+
+              <div>
+                <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ticket ID</dt>
+                <dd className="text-xs text-gray-400 font-mono">{ticket.id}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
