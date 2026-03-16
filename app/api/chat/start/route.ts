@@ -58,6 +58,21 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-real-ip') ||
       'Unknown'
 
+    // Rate limit: max waiting chats per IP
+    const chatLimit = parseInt(process.env.MAX_WAITING_CHATS_PER_IP || '2', 10)
+    const ipChatIds = (await redis.smembers(`ip_chats:${ip}`)) as string[]
+    let waitingCount = 0
+    for (const cid of ipChatIds) {
+      const c = await redis.get<Chat>(`chat:${cid}`)
+      if (c?.status === 'waiting') waitingCount++
+    }
+    if (waitingCount >= chatLimit) {
+      return NextResponse.json(
+        { error: `You already have ${waitingCount} chat${waitingCount !== 1 ? 's' : ''} waiting for support. Please wait for an agent to respond before starting a new one.` },
+        { status: 429, headers: corsHeaders }
+      )
+    }
+
     const chatMeta: ChatMeta = {
       currentPage: typeof meta?.currentPage === 'string' ? meta.currentPage : undefined,
       timezone: typeof meta?.timezone === 'string' ? meta.timezone : undefined,
@@ -94,6 +109,8 @@ export async function POST(request: NextRequest) {
     await redis.zadd('chats', { score: Date.now(), member: chatId })
     await redis.set(`chat_token:${token}`, chatId, { ex: 86400 })
     await redis.rpush(`chat_messages:${chatId}`, JSON.stringify(chatMessage))
+    // Track chat ID per IP for rate limiting
+    await redis.sadd(`ip_chats:${ip}`, chatId)
 
     // Notify admin panel in real-time
     await pusherServer.trigger(CHATS_CHANNEL, EVT_NEW_CHAT, {

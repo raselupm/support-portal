@@ -97,6 +97,19 @@ export async function POST(
       sender = 'visitor'
       senderEmail = chat.visitorEmail
       senderName = chat.visitorEmail
+
+      // Rate limit: max visitor messages per second
+      const msgLimit = parseInt(process.env.MAX_CHAT_MESSAGES_PER_SECOND || '3', 10)
+      const second = Math.floor(Date.now() / 1000)
+      const rateKey = `rate:chat_msg:${id}:${second}`
+      const msgCount = await redis.incr(rateKey)
+      await redis.expire(rateKey, 2)
+      if (msgCount > msgLimit) {
+        return NextResponse.json(
+          { error: 'You are sending messages too quickly. Please slow down.' },
+          { status: 429, headers: corsHeaders }
+        )
+      }
     } else {
       const session = await getSession()
       if (!session.email) {

@@ -1,3 +1,11 @@
+export interface User {
+  email: string
+  name?: string
+  createdAt: string
+  receiveEmailNotifications?: boolean  // users: email on ticket reply (default true)
+  receiveNewTicketEmails?: boolean     // admin/staff: email on new ticket (default true)
+}
+
 export interface Ticket {
   id: string
   userEmail: string

@@ -95,12 +95,15 @@ ADMIN_EMAILS=admin@example.com
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-redis-token
 
-# Email (SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=you@gmail.com
-SMTP_PASS=your-app-password
-SMTP_FROM=you@gmail.com
+# Email — Postmark (production)
+POSTMARK_SMTP_TOKEN=your-postmark-token
+POSTMARK_FROM_EMAIL=noreply@yourdomain.com
+
+# Email — Mailtrap (local development, takes priority when set)
+# MAILTRAP_TOKEN=any-non-empty-value
+# MAILTRAP_USER=your-mailtrap-inbox-user
+# MAILTRAP_PASS=your-mailtrap-inbox-pass
+# MAILTRAP_FROM_EMAIL=noreply@example.com
 
 # Pusher
 PUSHER_APP_ID=your-app-id
@@ -113,6 +116,11 @@ NEXT_PUBLIC_PUSHER_CLUSTER=mt1
 # Google reCAPTCHA v2 (optional)
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your-site-key
 RECAPTCHA_SECRET_KEY=your-secret-key
+
+# Rate limits — users only, not admin/staff (optional, defaults shown)
+# MAX_OPEN_TICKETS_PER_USER=3      # max open tickets a user can have at once
+# MAX_WAITING_CHATS_PER_IP=2       # max waiting chats from a single IP address
+# MAX_CHAT_MESSAGES_PER_SECOND=3   # max chat messages a visitor can send per second
 ```
 
 ### Run

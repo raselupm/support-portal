@@ -1,9 +1,12 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
+import { redis } from '@/lib/redis'
+import { User } from '@/lib/types'
 import { Ticket, Shield } from 'lucide-react'
 import LogoutButton from './logout-button'
 import Link from 'next/link'
+import TicketNotifier from '@/app/(admin)/ticket-notifier'
 
 export default async function PortalLayout({
   children,
@@ -20,7 +23,14 @@ export default async function PortalLayout({
   const staff = !admin && (await isStaff(session.email))
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
 
+  const [userRecord, staffRecord] = await Promise.all([
+    redis.get<User>(`user:${session.email}`),
+    redis.get<{ name?: string }>(`staff:${session.email}`),
+  ])
+  const displayName = userRecord?.name?.trim() || staffRecord?.name?.trim() || session.email
+
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,7 +58,12 @@ export default async function PortalLayout({
                   <span className="hidden sm:inline">Staff Panel</span>
                 </Link>
               )}
-              <span className="text-sm text-gray-500 hidden sm:block">{session.email}</span>
+              <Link
+                href="/profile"
+                className="text-sm text-gray-500 hover:text-gray-900 transition hidden sm:block"
+              >
+                {displayName}
+              </Link>
               <LogoutButton />
             </div>
           </div>
@@ -58,5 +73,7 @@ export default async function PortalLayout({
         {children}
       </main>
     </div>
+    {(admin || staff) && <TicketNotifier />}
+    </>
   )
 }

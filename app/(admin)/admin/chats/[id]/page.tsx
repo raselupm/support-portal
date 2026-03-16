@@ -38,10 +38,12 @@ export default async function ChatPage({ params }: Props) {
   const chat = await getChat(id)
   if (!chat) notFound()
 
-  const [messages, meta, staffRecord] = await Promise.all([
+  const [messages, meta, staffRecord, visitorSeenAt, staffSeenAt] = await Promise.all([
     getMessages(id),
     redis.get<ChatMeta>(`chat_meta:${id}`),
     redis.get<StaffMember>(`staff:${session.email.trim().toLowerCase()}`),
+    redis.get<string>(`chat_seen_visitor:${id}`),
+    redis.get<string>(`chat_seen_staff:${id}`),
   ])
 
   const staffName = staffRecord?.name || session.email
@@ -53,6 +55,8 @@ export default async function ChatPage({ params }: Props) {
       staffEmail={session.email}
       staffName={staffName}
       meta={meta ?? undefined}
+      initialVisitorSeenAt={visitorSeenAt ?? undefined}
+      initialStaffSeenAt={staffSeenAt ?? undefined}
     />
   )
 }

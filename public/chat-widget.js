@@ -68,7 +68,21 @@
     if (_blinkInterval) { clearInterval(_blinkInterval); _blinkInterval = null; }
     if (_originalTitle) document.title = _originalTitle;
   }
-  window.addEventListener('focus', stopTitleBlink);
+  window.addEventListener('focus', function () {
+    stopTitleBlink();
+    if (state.step === 'active' && state.open && state.chatId && state.token) {
+      markSeenAsVisitor();
+    }
+  });
+
+  function markSeenAsVisitor() {
+    if (!state.chatId || !state.token) return;
+    fetch(PORTAL_URL + '/api/chat/' + state.chatId + '/seen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: state.token }),
+    }).catch(function () {});
+  }
 
   // State
   var state = {
@@ -82,6 +96,7 @@
     pusherChannel: null,
     open: false,
     unread: 0,
+    staffSeenAt: null, // ISO string — when staff last read messages
   };
 
   // ---- DOM helpers ----
@@ -387,6 +402,25 @@
     winBody.appendChild(wrap);
   }
 
+  // Single check SVG path (delivered)
+  var singleCheckPath = 'M20 6 9 17 4 12';
+  // Double check SVG paths (seen)
+  var doubleCheckPath1 = 'M18 6 7 17 2 12';
+  var doubleCheckPath2 = 'M22 6 13 15';
+
+  function updateCheckIcon(svgEl, msgCreatedAt, seenAt) {
+    // Clear existing paths
+    while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+    var seen = seenAt && msgCreatedAt <= seenAt;
+    svgEl.setAttribute('stroke', seen ? '#3b82f6' : '#9ca3af');
+    var paths = seen ? [doubleCheckPath1, doubleCheckPath2] : [singleCheckPath];
+    paths.forEach(function (d) {
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', d);
+      svgEl.appendChild(p);
+    });
+  }
+
   function renderActive() {
     clearBody();
     state.unread = 0;
@@ -423,9 +457,25 @@
         gap: '2px',
       });
 
-      var meta = el('span', { fontSize: '11px', color: C.textSecondary }, {
-        textContent: msg.senderName + ' · ' + new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
+      var timeStr = msg.senderName + ' · ' + new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var meta = el('span', { fontSize: '11px', color: C.textSecondary, display: 'flex', alignItems: 'center', gap: '3px' });
+      meta.appendChild(document.createTextNode(timeStr));
+
+      // Check icon for visitor messages
+      var checkIconEl = null;
+      if (isVisitor && !msg.id.startsWith('temp-')) {
+        checkIconEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        checkIconEl.setAttribute('width', '13');
+        checkIconEl.setAttribute('height', '13');
+        checkIconEl.setAttribute('viewBox', '0 0 24 24');
+        checkIconEl.setAttribute('fill', 'none');
+        checkIconEl.setAttribute('stroke-width', '2.5');
+        checkIconEl.setAttribute('stroke-linecap', 'round');
+        checkIconEl.setAttribute('stroke-linejoin', 'round');
+        checkIconEl.dataset.checkFor = msg.createdAt;
+        updateCheckIcon(checkIconEl, msg.createdAt, state.staffSeenAt);
+        meta.appendChild(checkIconEl);
+      }
 
       var bubble = el('div', {
         padding: '8px 12px', borderRadius: '14px', fontSize: '13px',
@@ -596,10 +646,19 @@
 
     msgList.scrollTop = msgList.scrollHeight;
 
-    // Expose msgList, appendMessage and showTyping for Pusher
+    // Expose msgList, appendMessage, showTyping, updateSeenIcons for Pusher
     state._msgList = msgList;
     state._appendMessage = appendMessage;
     state._showTyping = showTyping;
+    state._updateSeenIcons = function (seenAt) {
+      var icons = msgList.querySelectorAll('[data-check-for]');
+      icons.forEach(function (icon) {
+        updateCheckIcon(icon, icon.dataset.checkFor, seenAt);
+      });
+    };
+
+    // Mark seen on open
+    markSeenAsVisitor();
 
     setTimeout(function () { textInput.focus(); }, 50);
   }
@@ -886,11 +945,22 @@
           badge.style.display = 'block';
         }
 
-        // Notify only for staff messages (incoming to visitor) when tab not focused
-        if ((msg.sender === 'staff' || msg.sender === 'system') && !document.hasFocus()) {
-          playNotificationSound();
-          startTitleBlink();
+        // Notify for staff/system messages
+        if (msg.sender === 'staff' || msg.sender === 'system') {
+          if (state.open && document.hasFocus()) {
+            markSeenAsVisitor();
+          } else {
+            playNotificationSound();
+            startTitleBlink();
+          }
         }
+      });
+
+      state.pusherChannel.bind('messages-seen', function (data) {
+        if (data.seenBy !== 'staff') return;
+        state.staffSeenAt = data.seenAt;
+        // Re-render check icons on all visible visitor messages
+        if (state._updateSeenIcons) state._updateSeenIcons(data.seenAt);
       });
 
       state.pusherChannel.bind('typing', function (data) {

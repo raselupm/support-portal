@@ -4,6 +4,7 @@ import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
 import { Ticket, Comment } from '@/lib/types'
 import { nanoid } from 'nanoid'
+import { pusherServer, TICKETS_CHANNEL, EVT_TICKET_REPLY, ticketChannel, EVT_TICKET_COMMENT } from '@/lib/pusher'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -60,11 +61,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     await redis.set(`ticket:${id}`, JSON.stringify(updatedTicket))
 
-    // Track staff reply stats
+    // Broadcast comment to anyone viewing this ticket
+    await pusherServer.trigger(ticketChannel(id), EVT_TICKET_COMMENT, comment)
+
+    // Track staff reply stats / notify admin for customer replies
     if (staff) {
-      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+      const today = new Date().toISOString().split('T')[0]
       await redis.incr(`replies_by_day:${today}`)
       await redis.incr(`staff_replies:${session.email}:${today}`)
+    } else {
+      // Customer replied — notify admin/staff
+      await pusherServer.trigger(TICKETS_CHANNEL, EVT_TICKET_REPLY, {
+        id: ticket.id,
+        title: ticket.title,
+        userEmail: ticket.userEmail,
+      })
     }
 
     return NextResponse.json({ comment }, { status: 201 })

@@ -1,14 +1,25 @@
 import nodemailer from 'nodemailer'
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.postmarkapp.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.POSTMARK_SMTP_TOKEN,
-    pass: process.env.POSTMARK_SMTP_TOKEN,
-  },
-})
+const isMailtrap = !!process.env.MAILTRAP_TOKEN
+
+const transporter = isMailtrap
+  ? nodemailer.createTransport({
+      host: 'sandbox.smtp.mailtrap.io',
+      port: 2525,
+      auth: {
+        user: process.env.MAILTRAP_USER,
+        pass: process.env.MAILTRAP_PASS,
+      },
+    })
+  : nodemailer.createTransport({
+      host: 'smtp.postmarkapp.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.POSTMARK_SMTP_TOKEN,
+        pass: process.env.POSTMARK_SMTP_TOKEN,
+      },
+    })
 
 export async function sendOtpEmail(email: string, otp: string): Promise<void> {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
@@ -62,8 +73,12 @@ export async function sendOtpEmail(email: string, otp: string): Promise<void> {
 
   const text = `Your ${appName} login code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you did not request this code, you can safely ignore this email.`
 
+  const fromEmail = isMailtrap
+    ? (process.env.MAILTRAP_FROM_EMAIL || 'noreply@example.com')
+    : process.env.POSTMARK_FROM_EMAIL
+
   await transporter.sendMail({
-    from: `"${appName}" <${process.env.POSTMARK_FROM_EMAIL}>`,
+    from: `"${appName}" <${fromEmail}>`,
     to: email,
     subject: `Your login code: ${otp}`,
     text,

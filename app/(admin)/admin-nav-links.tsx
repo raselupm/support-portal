@@ -10,34 +10,38 @@ import { Chat } from '@/lib/types'
 export default function AdminNavLinks({
   isAdmin,
   initialWaitingCount,
+  initialOpenTicketCount,
 }: {
   isAdmin: boolean
   initialWaitingCount: number
+  initialOpenTicketCount: number
 }) {
   const pathname = usePathname()
   const [waitingCount, setWaitingCount] = useState(initialWaitingCount)
+  const [openTicketCount, setOpenTicketCount] = useState(initialOpenTicketCount)
 
   useEffect(() => {
     const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
       cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
     })
-    const channel = pusher.subscribe('chats')
+    const chatsChannel = pusher.subscribe('chats')
+    const ticketsChannel = pusher.subscribe('tickets')
 
-    channel.bind('new-chat', (data: { chat: Chat }) => {
-      if (data.chat.status === 'waiting') {
-        setWaitingCount((n) => n + 1)
-      }
+    chatsChannel.bind('new-chat', (data: { chat: Chat }) => {
+      if (data.chat.status === 'waiting') setWaitingCount((n) => n + 1)
+    })
+    chatsChannel.bind('chat-updated', (chat: Chat) => {
+      if (chat.status !== 'waiting') setWaitingCount((n) => Math.max(0, n - 1))
     })
 
-    channel.bind('chat-updated', (chat: Chat) => {
-      if (chat.status !== 'waiting') {
-        setWaitingCount((n) => Math.max(0, n - 1))
-      }
-    })
+    ticketsChannel.bind('new-ticket', () => setOpenTicketCount((n) => n + 1))
+    ticketsChannel.bind('ticket-reply', () => setOpenTicketCount((n) => n + 1))
 
     return () => {
-      channel.unbind_all()
+      chatsChannel.unbind_all()
+      ticketsChannel.unbind_all()
       pusher.unsubscribe('chats')
+      pusher.unsubscribe('tickets')
       pusher.disconnect()
     }
   }, [])
@@ -83,7 +87,12 @@ export default function AdminNavLinks({
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
         >
           <Ticket className="w-4 h-4 flex-shrink-0" />
-          All Tickets
+          <span className="flex-1">All Tickets</span>
+          {openTicketCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-bold bg-red-500 text-white leading-none">
+              {openTicketCount > 99 ? '99+' : openTicketCount}
+            </span>
+          )}
         </Link>
       </div>
     </nav>

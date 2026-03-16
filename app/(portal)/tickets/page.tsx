@@ -2,11 +2,12 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Ticket } from '@/lib/types'
+import { Ticket, User } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { Plus, Inbox } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
+import NamePrompt from './name-prompt'
 
 async function getTickets(email: string, admin: boolean): Promise<Ticket[]> {
   let ticketIds: string[] = []
@@ -39,8 +40,15 @@ export default async function TicketsPage() {
   const privileged = admin || staff  // sees all tickets, no create button
   const tickets = await getTickets(session.email, privileged)
 
+  const [userRecord, staffRecord] = await Promise.all([
+    redis.get<User>(`user:${session.email}`),
+    redis.get<{ name?: string }>(`staff:${session.email}`),
+  ])
+  const hasName = !!(userRecord?.name?.trim() || staffRecord?.name?.trim())
+
   return (
     <div>
+      {!hasName && <NamePrompt />}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">

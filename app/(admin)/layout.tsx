@@ -2,12 +2,13 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Chat } from '@/lib/types'
+import { Chat, Ticket as TicketType } from '@/lib/types'
 import { Ticket } from 'lucide-react'
 import LogoutButton from '@/app/(portal)/logout-button'
 import AdminNavLinks from './admin-nav-links'
 import OnlineUsers from './online-users'
 import ChatNotifier from './chat-notifier'
+import TicketNotifier from './ticket-notifier'
 import NavigationProgress from './navigation-progress'
 
 async function getWaitingCount(): Promise<number> {
@@ -17,6 +18,20 @@ async function getWaitingCount(): Promise<number> {
     for (const id of chatIds) {
       const chat = await redis.get<Chat>(`chat:${id}`)
       if (chat?.status === 'waiting') count++
+    }
+    return count
+  } catch {
+    return 0
+  }
+}
+
+async function getOpenTicketCount(): Promise<number> {
+  try {
+    const ticketIds = (await redis.zrange('tickets', 0, -1)) as string[]
+    let count = 0
+    for (const id of ticketIds) {
+      const ticket = await redis.get<TicketType>(`ticket:${id}`)
+      if (ticket?.status === 'open') count++
     }
     return count
   } catch {
@@ -40,7 +55,7 @@ export default async function AdminLayout({
   }
 
   const admin = isAdmin(session.email)
-  const waitingCount = await getWaitingCount()
+  const [waitingCount, openTicketCount] = await Promise.all([getWaitingCount(), getOpenTicketCount()])
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
 
   return (
@@ -64,7 +79,7 @@ export default async function AdminLayout({
           )}
         </div>
         <div className="flex-1 overflow-y-auto flex flex-col">
-          <AdminNavLinks isAdmin={admin} initialWaitingCount={waitingCount} />
+          <AdminNavLinks isAdmin={admin} initialWaitingCount={waitingCount} initialOpenTicketCount={openTicketCount} />
           <div className="mt-auto">
             <OnlineUsers currentEmail={session.email} />
           </div>
@@ -89,6 +104,7 @@ export default async function AdminLayout({
       </div>
     </div>
     <ChatNotifier />
+    <TicketNotifier />
     <NavigationProgress />
     </>
   )

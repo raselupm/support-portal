@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi } from 'lucide-react'
+import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi, Check, CheckCheck } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { Chat, ChatMessage, ChatMeta } from '@/lib/types'
 
@@ -61,6 +61,8 @@ interface Props {
   staffEmail: string
   staffName: string
   meta?: ChatMeta
+  initialVisitorSeenAt?: string
+  initialStaffSeenAt?: string
 }
 
 function StatusBadge({ status }: { status: Chat['status'] }) {
@@ -107,6 +109,8 @@ export default function StaffChatWindow({
   staffEmail,
   staffName,
   meta,
+  initialVisitorSeenAt,
+  initialStaffSeenAt,
 }: Props) {
   const [chat, setChat] = useState<Chat>(initialChat)
   const [messages, setMessages] = useState<DisplayMessage[]>(initialMessages)
@@ -115,6 +119,7 @@ export default function StaffChatWindow({
   const [joining, setJoining] = useState(false)
   const [closing, setClosing] = useState(false)
   const [visitorTyping, setVisitorTyping] = useState<string | null>(null)
+  const [visitorSeenAt, setVisitorSeenAt] = useState<string | undefined>(initialVisitorSeenAt)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -128,11 +133,16 @@ export default function StaffChatWindow({
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  const markSeen = useCallback(() => {
+    fetch(`/api/chat/${initialChat.id}/seen`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+  }, [initialChat.id])
+
   useEffect(() => {
-    const onFocus = () => stopTitleBlink()
+    markSeen()
+    const onFocus = () => { stopTitleBlink(); markSeen() }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
-  }, [])
+  }, [markSeen])
 
   // Real-time via Pusher
   useEffect(() => {
@@ -147,9 +157,13 @@ export default function StaffChatWindow({
         if (prev.find((m) => m.id === msg.id)) return prev
         return [...prev, msg]
       })
-      if (msg.sender !== 'staff' && !document.hasFocus()) {
-        playNotificationSound()
-        startTitleBlink()
+      if (msg.sender !== 'staff') {
+        if (document.hasFocus()) {
+          markSeen()
+        } else {
+          playNotificationSound()
+          startTitleBlink()
+        }
       }
     })
 
@@ -160,6 +174,10 @@ export default function StaffChatWindow({
         staffEmail: data.staffEmail ?? prev.staffEmail,
         staffName: data.staffName ?? prev.staffName,
       }))
+    })
+
+    channel.bind('messages-seen', (data: { seenBy: 'visitor' | 'staff'; seenAt: string }) => {
+      if (data.seenBy === 'visitor') setVisitorSeenAt(data.seenAt)
     })
 
     channel.bind('typing', (data: { name: string; sender: 'visitor' | 'staff' }) => {
@@ -335,6 +353,9 @@ export default function StaffChatWindow({
               )
             }
             const isStaffMsg = msg.sender === 'staff'
+            const isSending = msg.id.startsWith('temp-')
+            const isSeen = isStaffMsg && !isSending && !!visitorSeenAt && msg.createdAt <= visitorSeenAt
+            const isDelivered = isStaffMsg && !isSending
             return (
               <div
                 key={msg.id}
@@ -349,6 +370,13 @@ export default function StaffChatWindow({
                       minute: '2-digit',
                     })}
                   </span>
+                  {isStaffMsg && !isSending && (
+                    isSeen
+                      ? <CheckCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      : isDelivered
+                      ? <Check className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      : null
+                  )}
                 </div>
                 <div
                   className={`px-4 py-2.5 rounded-2xl text-sm max-w-[75%] ${

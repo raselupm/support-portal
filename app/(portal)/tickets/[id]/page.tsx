@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ArrowLeft, User } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
-import CommentItem from '@/components/comment-item'
+import CommentsLive from './comments-live'
 import CommentForm from './comment-form'
 import DeleteTicketButton from './delete-button'
 
@@ -87,17 +87,8 @@ export default async function TicketDetailPage({ params }: PageProps) {
             />
           </div>
 
-          {/* Comments */}
-          {comments.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Replies ({comments.length})
-              </h2>
-              {comments.map((comment) => (
-                <CommentItem key={comment.id} comment={comment} />
-              ))}
-            </div>
-          )}
+          {/* Comments — live via Pusher */}
+          <CommentsLive ticketId={ticket.id} initialComments={comments} />
 
           {/* Comment Form */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
