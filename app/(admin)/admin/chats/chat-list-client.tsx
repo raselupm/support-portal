@@ -89,7 +89,58 @@ export default function ChatListClient({ initialChats, isAdmin }: { initialChats
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <table className="w-full text-sm">
+      {/* Mobile card list */}
+      <div className="md:hidden divide-y divide-gray-100">
+        {chats.map((chat) => (
+          <div key={chat.id} className="p-4 flex items-start gap-3">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-medium text-gray-900 text-sm">{chat.visitorName || chat.visitorEmail}</p>
+                <StatusBadge status={chat.status} />
+              </div>
+              {chat.visitorName && (
+                <p className="text-xs text-gray-500">{chat.visitorEmail}</p>
+              )}
+              <div className="flex items-center gap-3 text-xs text-gray-400">
+                <span>{chat.messageCount} msg{chat.messageCount !== 1 ? 's' : ''}</span>
+                <span>·</span>
+                <span>{formatDistanceToNow(new Date(chat.createdAt), { addSuffix: true })}</span>
+                {chat.staffName && (
+                  <>
+                    <span>·</span>
+                    <span>{chat.staffName}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link
+                href={`/admin/chats/${chat.id}`}
+                className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  chat.status === 'closed'
+                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {chat.status === 'closed' ? 'View' : 'Join'}
+              </Link>
+              {isAdmin && (
+                <button
+                  onClick={() => handleDelete(chat.id)}
+                  disabled={deleting === chat.id}
+                  className="inline-flex items-center p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                  title="Delete chat"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <table className="hidden md:table w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             <th className="text-left px-4 py-3 font-medium text-gray-600">Visitor</th>

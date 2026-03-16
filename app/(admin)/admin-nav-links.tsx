@@ -11,10 +11,12 @@ export default function AdminNavLinks({
   isAdmin,
   initialWaitingCount,
   initialOpenTicketCount,
+  onNavClick,
 }: {
   isAdmin: boolean
   initialWaitingCount: number
   initialOpenTicketCount: number
+  onNavClick?: () => void
 }) {
   const pathname = usePathname()
   const [waitingCount, setWaitingCount] = useState(initialWaitingCount)
@@ -65,6 +67,7 @@ export default function AdminNavLinks({
           <Link
             key={href}
             href={href}
+            onClick={onNavClick}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               active
                 ? 'bg-blue-50 text-blue-700'
@@ -84,6 +87,7 @@ export default function AdminNavLinks({
       <div className="mt-2 pt-2 border-t border-gray-100">
         <Link
           href="/tickets"
+          onClick={onNavClick}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
         >
           <Ticket className="w-4 h-4 flex-shrink-0" />

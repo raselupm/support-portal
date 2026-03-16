@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi, Check, CheckCheck } from 'lucide-react'
+import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi, Check, CheckCheck, Info } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { Chat, ChatMessage, ChatMeta } from '@/lib/types'
 
@@ -120,6 +120,7 @@ export default function StaffChatWindow({
   const [closing, setClosing] = useState(false)
   const [visitorTyping, setVisitorTyping] = useState<string | null>(null)
   const [visitorSeenAt, setVisitorSeenAt] = useState<string | undefined>(initialVisitorSeenAt)
+  const [showInfo, setShowInfo] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -286,7 +287,7 @@ export default function StaffChatWindow({
   const displayName = chat.visitorName || chat.visitorEmail
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)] max-h-[800px]">
+    <div className="flex gap-4 h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] max-h-[800px]">
 
       {/* ── Chat panel ───────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
@@ -321,7 +322,8 @@ export default function StaffChatWindow({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 <UserCheck className="w-3.5 h-3.5" />
-                {joining ? 'Joining...' : 'Join Chat'}
+                <span className="hidden sm:inline">{joining ? 'Joining...' : 'Join Chat'}</span>
+                <span className="sm:hidden">{joining ? '...' : 'Join'}</span>
               </button>
             )}
             {chat.status === 'active' && (
@@ -331,9 +333,20 @@ export default function StaffChatWindow({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-medium hover:bg-red-100 disabled:opacity-50 transition-colors border border-red-200"
               >
                 <X className="w-3.5 h-3.5" />
-                {closing ? 'Closing...' : 'Close Chat'}
+                <span className="hidden sm:inline">{closing ? 'Closing...' : 'Close Chat'}</span>
+                <span className="sm:hidden">{closing ? '...' : 'Close'}</span>
               </button>
             )}
+            {/* Visitor info toggle — mobile only */}
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              className={`lg:hidden p-1.5 rounded-lg transition-colors ${
+                showInfo ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+              title="Visitor info"
+            >
+              <Info className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -466,7 +479,7 @@ export default function StaffChatWindow({
       </div>
 
       {/* ── Visitor info sidebar ──────────────────────────────────────── */}
-      <div className="w-60 flex-shrink-0 flex flex-col gap-3 overflow-y-auto">
+      <div className={`flex-shrink-0 flex flex-col gap-3 overflow-y-auto lg:w-60 ${showInfo ? 'w-60' : 'hidden lg:flex'}`}>
         {/* Identity */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Visitor</p>

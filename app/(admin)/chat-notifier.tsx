@@ -65,11 +65,11 @@ export default function ChatNotifier() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-5 right-5 flex flex-col gap-2 z-50 pointer-events-none">
+    <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 flex flex-col gap-2 z-50 pointer-events-none w-[calc(100vw-2rem)] sm:w-72">
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex items-start gap-3 bg-white border border-gray-200 rounded-xl shadow-xl p-4 w-72"
+          className="pointer-events-auto flex items-start gap-3 bg-white border border-gray-200 rounded-xl shadow-xl p-4"
           style={{ animation: 'sp-slide-up 0.25s ease-out' }}
         >
           <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">

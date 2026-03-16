@@ -59,6 +59,13 @@ A full-featured customer support platform with ticket management and real-time l
   - Max waiting chats per IP
   - Max chat messages per second
 
+### PWA (Progressive Web App)
+- Installable on any device — browsers prompt "Add to Home Screen"
+- Offline support — pages cached after first visit; custom offline fallback shown when network is unavailable
+- App manifest with name, theme color, and shortcuts (New Ticket, My Tickets)
+- Custom app icon (`app-icon-sp.png`) used as browser favicon, Apple touch icon, and PWA icon
+- Service worker strategy: cache-first for static assets, network-first for pages and navigation
+
 ### Developer Features
 - Embeddable chat widget (`/chat-widget.js`) — drop a single `<script>` tag into any site
 - Captures visitor metadata: current URL, IP address, timezone, browser, OS, language
@@ -82,6 +89,7 @@ A full-featured customer support platform with ticket management and real-time l
 | Email | Nodemailer + Postmark (prod) / Mailtrap (dev) |
 | Rich text | Tiptap |
 | Background tasks | `after()` from `next/server` (Next.js 15 native) |
+| PWA | Web App Manifest + Service Worker (Workbox-free, hand-rolled) |
 
 ---
 
@@ -207,7 +215,9 @@ app/
 │   ├── admin/       # Admin-only actions
 │   └── internal/    # Internal endpoints (e.g. delayed email relay)
 public/
-└── chat-widget.js   # Embeddable chat widget (vanilla JS)
+├── chat-widget.js   # Embeddable chat widget (vanilla JS)
+├── sw.js            # Service worker (cache-first + network-first strategies)
+└── app-icon-sp.png  # App icon (favicon, Apple touch icon, PWA manifest icon)
 lib/
 ├── auth.ts          # isAdmin / isStaff helpers
 ├── session.ts       # iron-session config
