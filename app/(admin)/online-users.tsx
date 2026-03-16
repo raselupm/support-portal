@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Pusher, { PresenceChannel } from 'pusher-js'
 import { Circle } from 'lucide-react'
+import { useOnlineStatus } from './online-status-context'
 
 interface OnlineMember {
   id: string
@@ -11,25 +12,8 @@ interface OnlineMember {
 
 export default function OnlineUsers({ currentEmail }: { currentEmail: string }) {
   const [members, setMembers] = useState<OnlineMember[]>([])
-
-  // ── Heartbeat: tells /api/chat/availability we're online ──
-  useEffect(() => {
-    const beat = () => fetch('/api/admin/heartbeat', { method: 'POST' })
-    beat() // immediate on mount
-    const interval = setInterval(beat, 20_000)
-
-    const handleUnload = () =>
-      navigator.sendBeacon('/api/admin/heartbeat?_method=DELETE', '')
-
-    // Best-effort cleanup when tab closes
-    window.addEventListener('beforeunload', handleUnload)
-
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('beforeunload', handleUnload)
-      fetch('/api/admin/heartbeat', { method: 'DELETE' })
-    }
-  }, [])
+  // Heartbeat is now managed by OnlineStatusContext
+  useOnlineStatus()
 
   // ── Pusher presence channel: live sidebar list ──
   useEffect(() => {

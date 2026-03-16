@@ -6,6 +6,8 @@ import { Ticket, Menu, X } from 'lucide-react'
 import LogoutButton from '@/app/(portal)/logout-button'
 import AdminNavLinks from './admin-nav-links'
 import OnlineUsers from './online-users'
+import OnlineStatusToggle from './online-status-toggle'
+import { OnlineStatusProvider } from './online-status-context'
 
 interface Props {
   children: React.ReactNode
@@ -71,6 +73,7 @@ export default function AdminShell({
   )
 
   return (
+    <OnlineStatusProvider>
     <div className="min-h-screen flex bg-gray-50">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex w-60 flex-shrink-0 bg-white border-r border-gray-200 flex-col">
@@ -102,7 +105,8 @@ export default function AdminShell({
             <Menu className="w-5 h-5" />
           </button>
           <div className="hidden md:block" />
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <OnlineStatusToggle />
             <Link
               href="/profile"
               className="text-sm text-gray-500 hover:text-gray-900 transition hidden sm:block"
@@ -119,5 +123,6 @@ export default function AdminShell({
         </main>
       </div>
     </div>
+    </OnlineStatusProvider>
   )
 }
