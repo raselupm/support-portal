@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -116,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Add to user's tickets sorted set
     await redis.zadd(`user_tickets:${session.email}`, { score, member: id })
 
-    waitUntil(
+    after(
       (async () => {
         // Pusher real-time notification
         await pusherServer.trigger(TICKETS_CHANNEL, EVT_NEW_TICKET, {

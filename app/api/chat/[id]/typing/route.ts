@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -45,7 +44,7 @@ export async function POST(
     sender = 'staff'
   }
 
-  waitUntil(pusherServer.trigger(chatChannel(id), 'typing', { name: senderName, sender }))
+  after(pusherServer.trigger(chatChannel(id), 'typing', { name: senderName, sender }))
 
   return NextResponse.json({ ok: true }, { headers: corsHeaders })
 }

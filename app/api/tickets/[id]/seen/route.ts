@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -24,7 +23,7 @@ export async function POST(
     await redis.set(`ticket_seen_customer:${id}`, seenAt)
   }
 
-  waitUntil(
+  after(
     pusherServer.trigger(ticketChannel(id), EVT_TICKET_SEEN, {
       seenBy: staff ? 'staff' : 'customer',
       seenAt,

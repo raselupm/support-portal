@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { nanoid } from 'nanoid'
 import { redis } from '@/lib/redis'
 import { Ticket, User, Comment } from '@/lib/types'
 import { sendTicketReplyEmail } from '@/lib/email'
 import { pusherServer, ticketChannel, EVT_TICKET_COMMENT } from '@/lib/pusher'
 
-// Each hop can sleep up to SLEEP_CHUNK ms before relaying to the next hop.
-// Set maxDuration slightly above SLEEP_CHUNK to give the function breathing room.
-export const maxDuration = 60 // seconds — increase on Pro plan if needed
+// Each hop sleeps up to SLEEP_CHUNK ms then relays.
+// maxDuration must be > SLEEP_CHUNK/1000 seconds.
+export const maxDuration = 60 // seconds
 
 const SLEEP_CHUNK = 50_000 // 50s per hop
 
@@ -19,7 +18,7 @@ export interface TicketNotifyPayload {
   commentCreatedAt: string
   recipientEmails: string[]
   authorName: string
-  sendAfter: number // Unix ms timestamp
+  sendAfter: number // Unix ms
   baseUrl: string
 }
 
@@ -31,24 +30,24 @@ export async function POST(request: NextRequest) {
 
   const payload: TicketNotifyPayload = await request.json()
 
-  waitUntil(
-    (async () => {
+  after(async () => {
+    try {
       const remaining = payload.sendAfter - Date.now()
 
       if (remaining > 1000) {
-        // Not time yet — sleep for up to SLEEP_CHUNK ms then relay
+        // Sleep up to SLEEP_CHUNK ms then relay to next hop
         await new Promise<void>((r) => setTimeout(r, Math.min(remaining, SLEEP_CHUNK)))
 
         if (payload.sendAfter - Date.now() > 1000) {
-          // Still not time — fire next hop and exit
-          fetch(`${payload.baseUrl}/api/internal/ticket-notify`, {
+          // Still not time — relay (await to ensure request is dispatched)
+          await fetch(`${payload.baseUrl}/api/internal/ticket-notify`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${process.env.CRON_SECRET}`,
             },
             body: JSON.stringify(payload),
-          }).catch(console.error)
+          })
           return
         }
       }
@@ -62,7 +61,6 @@ export async function POST(request: NextRequest) {
       let emailSent = false
 
       if (isStaff) {
-        // Staff replied → notify customer if they haven't seen it
         const seenAt = await redis.get<string>(`ticket_seen_customer:${ticketId}`)
         const wasSeen = seenAt && new Date(seenAt) > new Date(commentCreatedAt)
         if (!wasSeen) {
@@ -73,7 +71,6 @@ export async function POST(request: NextRequest) {
           }
         }
       } else {
-        // Customer replied → notify staff who haven't seen it
         const seenAt = await redis.get<string>(`ticket_seen_staff:${ticketId}`)
         const wasSeen = seenAt && new Date(seenAt) > new Date(commentCreatedAt)
         if (!wasSeen) {
@@ -91,7 +88,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Add system message so the thread shows the email was sent
       if (emailSent) {
         const now = new Date().toISOString()
         const systemComment: Comment = {
@@ -106,8 +102,10 @@ export async function POST(request: NextRequest) {
         await redis.rpush(`ticket_comments:${ticketId}`, JSON.stringify(systemComment))
         await pusherServer.trigger(ticketChannel(ticketId), EVT_TICKET_COMMENT, systemComment)
       }
-    })()
-  )
+    } catch (err) {
+      console.error('[ticket-notify] background error:', err)
+    }
+  })
 
   return NextResponse.json({ ok: true })
 }

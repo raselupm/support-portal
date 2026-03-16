@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -65,20 +64,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Capture base URL before entering async context
     const baseUrl = new URL(request.url).origin
 
-    waitUntil(
-      (async () => {
+    after(async () => {
+      try {
         // 1. Broadcast comment to anyone viewing this ticket
         await pusherServer.trigger(ticketChannel(id), EVT_TICKET_COMMENT, comment)
 
         if (staff) {
-          // Track staff reply stats
           const today = now.split('T')[0]
           await Promise.all([
             redis.incr(`replies_by_day:${today}`),
             redis.incr(`staff_replies:${session.email}:${today}`),
           ])
         } else {
-          // Customer replied — notify admin/staff via Pusher
           await pusherServer.trigger(TICKETS_CHANNEL, EVT_TICKET_REPLY, {
             id: ticket.id,
             title: ticket.title,
@@ -103,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
               ]),
             ]
 
-        // 4. Fire self-relaying notification (returns immediately, delays internally)
+        // 4. Kick off self-relaying delayed notification (awaited to confirm receipt)
         const payload: TicketNotifyPayload = {
           ticketId: id,
           commentId: comment.id,
@@ -115,16 +112,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           baseUrl,
         }
 
-        fetch(`${baseUrl}/api/internal/ticket-notify`, {
+        await fetch(`${baseUrl}/api/internal/ticket-notify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${process.env.CRON_SECRET}`,
           },
           body: JSON.stringify(payload),
-        }).catch(console.error)
-      })()
-    )
+        })
+      } catch (err) {
+        console.error('[comments] after() error:', err)
+      }
+    })
 
     return NextResponse.json({ comment }, { status: 201 })
   } catch (err) {
