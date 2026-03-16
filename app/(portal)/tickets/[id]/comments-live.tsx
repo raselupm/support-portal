@@ -6,7 +6,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ShieldCheck, User } from 'lucide-react'
 import { Comment } from '@/lib/types'
 
-function CommentBubble({ comment, animate }: { comment: Comment; animate: boolean }) {
+function CommentBubble({ comment, animate, nameMap }: { comment: Comment; animate: boolean; nameMap: Record<string, string> }) {
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${
@@ -27,7 +27,7 @@ function CommentBubble({ comment, animate }: { comment: Comment; animate: boolea
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="text-sm font-medium text-gray-700 truncate">{comment.authorEmail}</span>
+          <span className="text-sm font-medium text-gray-700 truncate">{nameMap[comment.authorEmail] ?? comment.authorEmail}</span>
           {comment.isAdmin && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 ring-1 ring-inset ring-green-200 flex-shrink-0">
               Staff
@@ -49,9 +49,10 @@ function CommentBubble({ comment, animate }: { comment: Comment; animate: boolea
 interface Props {
   ticketId: string
   initialComments: Comment[]
+  nameMap: Record<string, string>
 }
 
-export default function CommentsLive({ ticketId, initialComments }: Props) {
+export default function CommentsLive({ ticketId, initialComments, nameMap }: Props) {
   const [liveComments, setLiveComments] = useState<Comment[]>([])
 
   // When server refreshes and initialComments updates, drop any live comments
@@ -92,6 +93,7 @@ export default function CommentsLive({ ticketId, initialComments }: Props) {
           key={comment.id}
           comment={comment}
           animate={!initialIds.has(comment.id)}
+          nameMap={nameMap}
         />
       ))}
     </div>

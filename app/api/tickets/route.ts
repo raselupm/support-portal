@@ -76,11 +76,18 @@ export async function POST(request: NextRequest) {
     if (!title || typeof title !== 'string' || !title.trim()) {
       return NextResponse.json({ error: 'Title is required.' }, { status: 400 })
     }
+    if (title.trim().length < 10) {
+      return NextResponse.json({ error: 'Title must be at least 10 characters.' }, { status: 400 })
+    }
     if (title.trim().length > 120) {
       return NextResponse.json({ error: 'Title must be 120 characters or fewer.' }, { status: 400 })
     }
     if (!description || typeof description !== 'string' || !description.trim()) {
       return NextResponse.json({ error: 'Description is required.' }, { status: 400 })
+    }
+    const descriptionText = description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+    if (descriptionText.length < 20) {
+      return NextResponse.json({ error: 'Description must be at least 20 characters.' }, { status: 400 })
     }
 
     const id = nanoid(10)

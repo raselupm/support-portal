@@ -11,6 +11,14 @@ const PRODUCTS = (process.env.NEXT_PUBLIC_PRODUCTS || process.env.PRODUCTS || 'P
   .map((p) => p.trim())
   .filter(Boolean)
 
+const MIN_TITLE = 10
+const MAX_TITLE = 120
+const MIN_DESCRIPTION = 20
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+}
+
 export default function NewTicketPage() {
   const router = useRouter()
   const [product, setProduct] = useState(PRODUCTS[0] || '')
@@ -18,12 +26,16 @@ export default function NewTicketPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [touched, setTouched] = useState({ title: false, description: false })
 
-  const MAX_TITLE = 120
+  const descriptionText = stripHtml(description)
+  const titleTooShort = touched.title && title.trim().length > 0 && title.trim().length < MIN_TITLE
+  const descriptionTooShort = touched.description && descriptionText.length > 0 && descriptionText.length < MIN_DESCRIPTION
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setTouched({ title: true, description: true })
 
     if (!product) {
       setError('Please select a product.')
@@ -33,12 +45,20 @@ export default function NewTicketPage() {
       setError('Please enter a title.')
       return
     }
+    if (title.trim().length < MIN_TITLE) {
+      setError(`Title must be at least ${MIN_TITLE} characters.`)
+      return
+    }
     if (title.trim().length > MAX_TITLE) {
       setError(`Title must be ${MAX_TITLE} characters or fewer.`)
       return
     }
-    if (!description || description === '<p></p>') {
+    if (!description || description === '<p></p>' || !descriptionText) {
       setError('Please enter a description.')
+      return
+    }
+    if (descriptionText.length < MIN_DESCRIPTION) {
+      setError(`Description must be at least ${MIN_DESCRIPTION} characters.`)
       return
     }
 
@@ -114,24 +134,47 @@ export default function NewTicketPage() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, title: true }))}
               maxLength={MAX_TITLE}
               placeholder="Briefly describe the issue"
               disabled={loading}
-              className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
+              className={`w-full px-3 py-2.5 rounded-lg border text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm ${titleTooShort ? 'border-amber-400 bg-amber-50/40' : 'border-gray-300'}`}
             />
+            {titleTooShort && (
+              <p className="mt-1.5 text-xs text-amber-600">
+                Title is too short — minimum {MIN_TITLE} characters ({title.trim().length}/{MIN_TITLE}).
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Description
-            </label>
-            <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              {touched.description && descriptionText.length > 0 && (
+                <span className={`text-xs ${descriptionText.length < MIN_DESCRIPTION ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {descriptionText.length} chars
+                </span>
+              )}
+            </div>
+            <div
+              className={`border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent ${descriptionTooShort ? 'border-amber-400 bg-amber-50/40' : 'border-gray-300'}`}
+            >
               <TiptapEditor
                 content={description}
-                onChange={setDescription}
+                onChange={(val) => {
+                  setDescription(val)
+                  setTouched((t) => ({ ...t, description: true }))
+                }}
                 placeholder="Describe your issue in detail..."
               />
             </div>
+            {descriptionTooShort && (
+              <p className="mt-1.5 text-xs text-amber-600">
+                Description is too short — minimum {MIN_DESCRIPTION} characters ({descriptionText.length}/{MIN_DESCRIPTION}).
+              </p>
+            )}
           </div>
 
           {error && (

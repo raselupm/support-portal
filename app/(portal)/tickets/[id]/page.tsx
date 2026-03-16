@@ -2,9 +2,9 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Ticket, Comment } from '@/lib/types'
+import { Ticket, Comment, User } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, User } from 'lucide-react'
+import { ArrowLeft, User as UserIcon } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
 import CommentsLive from './comments-live'
@@ -13,6 +13,20 @@ import DeleteTicketButton from './delete-button'
 
 interface PageProps {
   params: Promise<{ id: string }>
+}
+
+async function getNameMap(emails: string[]): Promise<Record<string, string>> {
+  const unique = [...new Set(emails)]
+  const entries = await Promise.all(
+    unique.map(async (email) => {
+      const user = await redis.get<User>(`user:${email}`)
+      if (user?.name) return [email, user.name] as const
+      const staff = await redis.get<User>(`staff:${email}`)
+      if (staff?.name) return [email, staff.name] as const
+      return [email, email] as const
+    })
+  )
+  return Object.fromEntries(entries)
 }
 
 async function getTicketData(id: string) {
@@ -33,7 +47,10 @@ async function getTicketData(id: string) {
     })
     .filter((c): c is Comment => c !== null)
 
-  return { ticket, comments }
+  const allEmails = [ticket.userEmail, ...comments.map((c) => c.authorEmail)]
+  const nameMap = await getNameMap(allEmails)
+
+  return { ticket, comments, nameMap }
 }
 
 export default async function TicketDetailPage({ params }: PageProps) {
@@ -44,7 +61,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
   const data = await getTicketData(id)
   if (!data) notFound()
 
-  const { ticket, comments } = data
+  const { ticket, comments, nameMap } = data
   const admin = isAdmin(session.email)
 
   // Customers can only see their own tickets
@@ -72,10 +89,10 @@ export default async function TicketDetailPage({ params }: PageProps) {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <User className="w-3.5 h-3.5 text-blue-600" />
+                <UserIcon className="w-3.5 h-3.5 text-blue-600" />
               </div>
               <div>
-                <span className="text-sm font-medium text-gray-700">{ticket.userEmail}</span>
+                <span className="text-sm font-medium text-gray-700">{nameMap[ticket.userEmail]}</span>
                 <span className="text-xs text-gray-400 ml-2">
                   {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
                 </span>
@@ -88,7 +105,7 @@ export default async function TicketDetailPage({ params }: PageProps) {
           </div>
 
           {/* Comments — live via Pusher */}
-          <CommentsLive ticketId={ticket.id} initialComments={comments} />
+          <CommentsLive ticketId={ticket.id} initialComments={comments} nameMap={nameMap} />
 
           {/* Comment Form */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -134,7 +151,10 @@ export default async function TicketDetailPage({ params }: PageProps) {
               {admin && ticket.userEmail !== session.email && (
                 <div>
                   <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Customer</dt>
-                  <dd className="text-sm text-gray-700 break-all">{ticket.userEmail}</dd>
+                  <dd className="text-sm text-gray-700">{nameMap[ticket.userEmail]}</dd>
+                  {nameMap[ticket.userEmail] !== ticket.userEmail && (
+                    <dd className="text-xs text-gray-400 break-all">{ticket.userEmail}</dd>
+                  )}
                 </div>
               )}
 
