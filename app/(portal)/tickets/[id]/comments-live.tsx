@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Pusher from 'pusher-js'
 import { formatDistanceToNow } from 'date-fns'
-import { ShieldCheck, User, Check, CheckCheck } from 'lucide-react'
+import { ShieldCheck, User, Check, CheckCheck, Mail } from 'lucide-react'
 import { Comment } from '@/lib/types'
 
 interface CommentBubbleProps {
@@ -16,6 +16,20 @@ interface CommentBubbleProps {
 }
 
 function CommentBubble({ comment, animate, nameMap, isMine, isSeen, seenAt }: CommentBubbleProps) {
+  if (comment.isSystem) {
+    return (
+      <div
+        className="flex items-center gap-2 justify-center py-1"
+        style={animate ? { animation: 'sp-slide-up 0.3s ease-out' } : undefined}
+      >
+        <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+        <span className="text-xs text-gray-400">
+          {comment.content} {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${
@@ -134,7 +148,7 @@ export default function CommentsLive({
 
   // Determine seen state for a comment authored by the current user
   function getSeenInfo(comment: Comment): { isSeen: boolean; seenAt: string | null } {
-    if (comment.authorEmail !== currentUserEmail) return { isSeen: false, seenAt: null }
+    if (comment.isSystem || comment.authorEmail !== currentUserEmail) return { isSeen: false, seenAt: null }
     // If I'm staff, has the customer seen it?
     const relevantSeenAt = isCurrentUserStaff ? seenByCustomerAt : seenByStaffAt
     if (!relevantSeenAt) return { isSeen: false, seenAt: null }

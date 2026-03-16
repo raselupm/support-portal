@@ -23,6 +23,7 @@ export interface Comment {
   authorEmail: string
   content: string // HTML
   isAdmin: boolean
+  isSystem?: boolean // server-generated status message
   createdAt: string // ISO date
 }
 
