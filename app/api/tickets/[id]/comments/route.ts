@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getSession } from '@/lib/session'
-import { isAdmin, isStaff } from '@/lib/auth'
+import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
 import { Ticket, Comment } from '@/lib/types'
 import { nanoid } from 'nanoid'
 import { pusherServer, TICKETS_CHANNEL, EVT_TICKET_REPLY, ticketChannel, EVT_TICKET_COMMENT } from '@/lib/pusher'
+import type { TicketNotifyPayload } from '@/app/api/internal/ticket-notify/route'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -31,7 +33,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
     }
 
-    const admin = isAdmin(session.email)
     const staff = await isStaff(session.email)
 
     // Customers can only comment on their own tickets
@@ -61,22 +62,69 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     await redis.set(`ticket:${id}`, JSON.stringify(updatedTicket))
 
-    // Broadcast comment to anyone viewing this ticket
-    await pusherServer.trigger(ticketChannel(id), EVT_TICKET_COMMENT, comment)
+    // Capture base URL before entering async context
+    const baseUrl = new URL(request.url).origin
 
-    // Track staff reply stats / notify admin for customer replies
-    if (staff) {
-      const today = new Date().toISOString().split('T')[0]
-      await redis.incr(`replies_by_day:${today}`)
-      await redis.incr(`staff_replies:${session.email}:${today}`)
-    } else {
-      // Customer replied — notify admin/staff
-      await pusherServer.trigger(TICKETS_CHANNEL, EVT_TICKET_REPLY, {
-        id: ticket.id,
-        title: ticket.title,
-        userEmail: ticket.userEmail,
-      })
-    }
+    waitUntil(
+      (async () => {
+        // 1. Broadcast comment to anyone viewing this ticket
+        await pusherServer.trigger(ticketChannel(id), EVT_TICKET_COMMENT, comment)
+
+        if (staff) {
+          // Track staff reply stats
+          const today = now.split('T')[0]
+          await Promise.all([
+            redis.incr(`replies_by_day:${today}`),
+            redis.incr(`staff_replies:${session.email}:${today}`),
+          ])
+        } else {
+          // Customer replied — notify admin/staff via Pusher
+          await pusherServer.trigger(TICKETS_CHANNEL, EVT_TICKET_REPLY, {
+            id: ticket.id,
+            title: ticket.title,
+            userEmail: ticket.userEmail,
+          })
+        }
+
+        // 2. Resolve author display name
+        const [authorUser, authorStaff] = await Promise.all([
+          redis.get<{ name?: string }>(`user:${session.email}`),
+          redis.get<{ name?: string }>(`staff:${session.email}`),
+        ])
+        const authorName = authorUser?.name?.trim() || authorStaff?.name?.trim() || session.email
+
+        // 3. Build recipient list
+        const recipientEmails = staff
+          ? [ticket.userEmail]
+          : [
+              ...new Set([
+                ...((await redis.zrange('staff_list', 0, -1)) as string[]),
+                ...(process.env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+              ]),
+            ]
+
+        // 4. Fire self-relaying notification (returns immediately, delays internally)
+        const payload: TicketNotifyPayload = {
+          ticketId: id,
+          commentId: comment.id,
+          isStaff: staff,
+          commentCreatedAt: now,
+          recipientEmails,
+          authorName,
+          sendAfter: Date.now() + 2 * 60 * 1000,
+          baseUrl,
+        }
+
+        fetch(`${baseUrl}/api/internal/ticket-notify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.CRON_SECRET}`,
+          },
+          body: JSON.stringify(payload),
+        }).catch(console.error)
+      })()
+    )
 
     return NextResponse.json({ comment }, { status: 201 })
   } catch (err) {

@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { isAdmin } from '@/lib/auth'
+import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
 import { Ticket, Comment, User } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
@@ -48,9 +48,13 @@ async function getTicketData(id: string) {
     .filter((c): c is Comment => c !== null)
 
   const allEmails = [ticket.userEmail, ...comments.map((c) => c.authorEmail)]
-  const nameMap = await getNameMap(allEmails)
+  const [nameMap, seenByCustomerAt, seenByStaffAt] = await Promise.all([
+    getNameMap(allEmails),
+    redis.get<string>(`ticket_seen_customer:${id}`),
+    redis.get<string>(`ticket_seen_staff:${id}`),
+  ])
 
-  return { ticket, comments, nameMap }
+  return { ticket, comments, nameMap, seenByCustomerAt, seenByStaffAt }
 }
 
 export default async function TicketDetailPage({ params }: PageProps) {
@@ -61,8 +65,9 @@ export default async function TicketDetailPage({ params }: PageProps) {
   const data = await getTicketData(id)
   if (!data) notFound()
 
-  const { ticket, comments, nameMap } = data
+  const { ticket, comments, nameMap, seenByCustomerAt, seenByStaffAt } = data
   const admin = isAdmin(session.email)
+  const staff = await isStaff(session.email)
 
   // Customers can only see their own tickets
   if (!admin && ticket.userEmail !== session.email) {
@@ -105,7 +110,15 @@ export default async function TicketDetailPage({ params }: PageProps) {
           </div>
 
           {/* Comments — live via Pusher */}
-          <CommentsLive ticketId={ticket.id} initialComments={comments} nameMap={nameMap} />
+          <CommentsLive
+            ticketId={ticket.id}
+            initialComments={comments}
+            nameMap={nameMap}
+            currentUserEmail={session.email}
+            isCurrentUserStaff={staff}
+            initialSeenByCustomerAt={seenByCustomerAt ?? null}
+            initialSeenByStaffAt={seenByStaffAt ?? null}
+          />
 
           {/* Comment Form */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">

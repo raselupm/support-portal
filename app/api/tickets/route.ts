@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -115,34 +116,38 @@ export async function POST(request: NextRequest) {
     // Add to user's tickets sorted set
     await redis.zadd(`user_tickets:${session.email}`, { score, member: id })
 
-    await pusherServer.trigger(TICKETS_CHANNEL, EVT_NEW_TICKET, {
-      id: ticket.id,
-      title: ticket.title,
-      userEmail: ticket.userEmail,
-      product: ticket.product,
-    })
+    waitUntil(
+      (async () => {
+        // Pusher real-time notification
+        await pusherServer.trigger(TICKETS_CHANNEL, EVT_NEW_TICKET, {
+          id: ticket.id,
+          title: ticket.title,
+          userEmail: ticket.userEmail,
+          product: ticket.product,
+        })
 
-    // Send email notifications to staff/admin who have it enabled
-    const userRecord = await redis.get<User>(`user:${session.email}`)
-    const staffRecord = await redis.get<{ name?: string }>(`staff:${session.email}`)
-    const userName = userRecord?.name?.trim() || staffRecord?.name?.trim() || session.email
+        // Email notifications to staff/admin who have it enabled
+        const userRecord = await redis.get<User>(`user:${session.email}`)
+        const staffRecord = await redis.get<{ name?: string }>(`staff:${session.email}`)
+        const userName = userRecord?.name?.trim() || staffRecord?.name?.trim() || session.email
 
-    const staffEmails = (await redis.zrange('staff_list', 0, -1)) as string[]
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-    const allStaffEmails = [...new Set([...staffEmails, ...adminEmails])]
+        const staffEmails = (await redis.zrange('staff_list', 0, -1)) as string[]
+        const adminEmails = (process.env.ADMIN_EMAILS || '')
+          .split(',')
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+        const allStaffEmails = [...new Set([...staffEmails, ...adminEmails])]
 
-    const ticketPayload = { id: ticket.id, title: ticket.title, product: ticket.product, userEmail: ticket.userEmail, userName }
+        const ticketPayload = { id: ticket.id, title: ticket.title, product: ticket.product, userEmail: ticket.userEmail, userName }
 
-    await Promise.allSettled(
-      allStaffEmails.map(async (staffEmail) => {
-        const record = await redis.get<{ receiveNewTicketEmails?: boolean }>(`user:${staffEmail}`)
-        // Default is true — only skip if explicitly set to false
-        if (record?.receiveNewTicketEmails === false) return
-        await sendNewTicketEmail(staffEmail, ticketPayload)
-      })
+        await Promise.allSettled(
+          allStaffEmails.map(async (staffEmail) => {
+            const record = await redis.get<{ receiveNewTicketEmails?: boolean }>(`user:${staffEmail}`)
+            if (record?.receiveNewTicketEmails === false) return
+            await sendNewTicketEmail(staffEmail, ticketPayload)
+          })
+        )
+      })()
     )
 
     return NextResponse.json({ id, ticket }, { status: 201 })

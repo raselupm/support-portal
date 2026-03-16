@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { nanoid } from 'nanoid'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
@@ -38,9 +39,11 @@ export async function POST(
     }
     await redis.rpush(`chat_messages:${id}`, JSON.stringify(systemMessage))
 
-    await pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, systemMessage)
-    await pusherServer.trigger(chatChannel(id), EVT_STATUS_CHANGE, { status: 'closed' })
-    await pusherServer.trigger(CHATS_CHANNEL, EVT_CHAT_UPDATED, updatedChat)
+    waitUntil(Promise.all([
+      pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, systemMessage),
+      pusherServer.trigger(chatChannel(id), EVT_STATUS_CHANGE, { status: 'closed' }),
+      pusherServer.trigger(CHATS_CHANNEL, EVT_CHAT_UPDATED, updatedChat),
+    ]))
 
     return NextResponse.json({ chat: updatedChat })
   } catch (err) {

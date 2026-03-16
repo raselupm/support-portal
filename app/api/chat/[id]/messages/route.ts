@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
@@ -135,8 +136,7 @@ export async function POST(
     await redis.rpush(`chat_messages:${id}`, JSON.stringify(message))
     await redis.set(`chat:${id}`, JSON.stringify({ ...chat, updatedAt: now }))
 
-    // Real-time push to all chat subscribers
-    await pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, message)
+    waitUntil(pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, message))
 
     return NextResponse.json({ message }, { headers: corsHeaders })
   } catch (err) {

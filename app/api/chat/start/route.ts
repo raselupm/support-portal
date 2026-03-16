@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { Chat, ChatMessage, ChatMeta } from '@/lib/types'
@@ -112,11 +113,7 @@ export async function POST(request: NextRequest) {
     // Track chat ID per IP for rate limiting
     await redis.sadd(`ip_chats:${ip}`, chatId)
 
-    // Notify admin panel in real-time
-    await pusherServer.trigger(CHATS_CHANNEL, EVT_NEW_CHAT, {
-      chat,
-      messageCount: 1,
-    })
+    waitUntil(pusherServer.trigger(CHATS_CHANNEL, EVT_NEW_CHAT, { chat, messageCount: 1 }))
 
     return NextResponse.json(
       { chatId, token },
