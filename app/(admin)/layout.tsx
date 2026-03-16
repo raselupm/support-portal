@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Chat, Ticket as TicketType } from '@/lib/types'
+import { Chat, Ticket as TicketType, User } from '@/lib/types'
 import { Ticket } from 'lucide-react'
+import Link from 'next/link'
 import LogoutButton from '@/app/(portal)/logout-button'
 import AdminNavLinks from './admin-nav-links'
 import OnlineUsers from './online-users'
@@ -55,7 +56,13 @@ export default async function AdminLayout({
   }
 
   const admin = isAdmin(session.email)
-  const [waitingCount, openTicketCount] = await Promise.all([getWaitingCount(), getOpenTicketCount()])
+  const [waitingCount, openTicketCount, userRecord, staffRecord] = await Promise.all([
+    getWaitingCount(),
+    getOpenTicketCount(),
+    redis.get<User>(`user:${session.email}`),
+    redis.get<{ name?: string }>(`staff:${session.email}`),
+  ])
+  const displayName = userRecord?.name?.trim() || staffRecord?.name?.trim() || session.email
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
 
   return (
@@ -92,7 +99,12 @@ export default async function AdminLayout({
         <header className="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between flex-shrink-0">
           <div />
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500 hidden sm:block">{session.email}</span>
+            <Link
+              href="/profile"
+              className="text-sm text-gray-500 hover:text-gray-900 transition hidden sm:block"
+            >
+              {displayName}
+            </Link>
             <LogoutButton />
           </div>
         </header>

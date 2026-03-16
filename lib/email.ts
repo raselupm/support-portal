@@ -21,6 +21,94 @@ const transporter = isMailtrap
       },
     })
 
+export async function sendNewTicketEmail(
+  to: string,
+  ticket: { id: string; title: string; product: string; userEmail: string; userName: string }
+): Promise<void> {
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const ticketUrl = `${baseUrl}/admin/tickets/${ticket.id}`
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Support Ticket</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;">
+          <tr>
+            <td style="background-color:#2563eb;padding:24px 32px;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">${appName}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <h2 style="margin:0 0 8px;color:#111827;font-size:18px;font-weight:600;">New support ticket submitted</h2>
+              <p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.5;">
+                A customer has opened a new ticket that needs your attention.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:8px;padding:0;margin-bottom:24px;border:1px solid #e5e7eb;">
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">Title</p>
+                    <p style="margin:0;font-size:14px;color:#111827;font-weight:500;">${ticket.title}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">Product</p>
+                    <p style="margin:0;font-size:14px;color:#111827;">${ticket.product}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">From</p>
+                    <p style="margin:0;font-size:14px;color:#111827;">${ticket.userName}</p>
+                  </td>
+                </tr>
+              </table>
+              <a href="${ticketUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:6px;">
+                View Ticket →
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 32px;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">
+                You&apos;re receiving this because you have new ticket notifications enabled.
+                &copy; ${new Date().getFullYear()} ${appName}.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+
+  const text = `New ticket: ${ticket.title}\nProduct: ${ticket.product}\nFrom: ${ticket.userName} (${ticket.userEmail})\n\nView: ${ticketUrl}`
+
+  const fromEmail = isMailtrap
+    ? (process.env.MAILTRAP_FROM_EMAIL || 'noreply@example.com')
+    : process.env.POSTMARK_FROM_EMAIL
+
+  await transporter.sendMail({
+    from: `"${appName}" <${fromEmail}>`,
+    to,
+    subject: `New ticket: ${ticket.title}`,
+    text,
+    html,
+  })
+}
+
 export async function sendOtpEmail(email: string, otp: string): Promise<void> {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
 
