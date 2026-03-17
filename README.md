@@ -10,6 +10,7 @@ A full-featured customer support platform with ticket management and real-time l
 
 ### Customer Portal
 - **Email OTP login** — passwordless authentication via one-time codes
+- **Google OAuth login** — sign in with a Google account (optional, enabled via env vars)
 - **Submit support tickets** — rich text editor (Tiptap) with product categorization
   - Minimum character validation: title ≥ 10 chars, description ≥ 20 chars (plain text)
   - Inline amber warning shown before submit; blocked at API level too
@@ -51,6 +52,7 @@ A full-featured customer support platform with ticket management and real-time l
 - Email provider: Postmark (production) or Mailtrap (local dev)
 
 ### Security
+- Google OAuth login (optional) — "Continue with Google" button appears only when `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set
 - Google reCAPTCHA v2 on login (optional, configure via env vars)
 - Session-based auth with encrypted cookies (iron-session)
 - Admin-only actions protected at API level (ticket delete, chat delete, staff management)
@@ -151,6 +153,12 @@ NEXT_PUBLIC_PUSHER_CLUSTER=mt1
 # Generate with: openssl rand -hex 32
 CRON_SECRET=your-secret-here
 
+# Google OAuth (optional) — get credentials at https://console.cloud.google.com
+# Add authorized redirect URI: ${NEXT_PUBLIC_APP_URL}/api/auth/google/callback
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id
+
 # Google reCAPTCHA v2 (optional)
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your-site-key
 RECAPTCHA_SECRET_KEY=your-secret-key
@@ -209,7 +217,7 @@ app/
 ├── (portal)/        # Customer-facing portal (tickets, profile)
 ├── (admin)/         # Admin/staff panel (dashboard, chats, staff)
 ├── api/             # API routes
-│   ├── auth/        # OTP send/verify
+│   ├── auth/        # OTP send/verify, Google OAuth
 │   ├── tickets/     # Ticket CRUD + comments + seen tracking
 │   ├── chat/        # Chat start/send/join/close/typing/seen
 │   ├── admin/       # Admin-only actions
