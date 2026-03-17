@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, ArrowRight, Loader2 } from 'lucide-react'
 import Script from 'next/script'
@@ -16,17 +16,7 @@ declare global {
   }
 }
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const recaptchaRef = useRef<HTMLDivElement>(null)
-  const widgetIdRef = useRef<number | null>(null)
-  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
+function GoogleErrorReader({ onError }: { onError: (msg: string) => void }) {
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -39,9 +29,24 @@ export default function LoginPage() {
         google_no_email: 'Your Google account does not have an email address.',
         google_not_configured: 'Google login is not configured.',
       }
-      setError(messages[googleError] || 'Google sign-in failed. Please try again.')
+      onError(messages[googleError] || 'Google sign-in failed. Please try again.')
     }
-  }, [searchParams])
+  }, [searchParams, onError])
+
+  return null
+}
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const recaptchaRef = useRef<HTMLDivElement>(null)
+  const widgetIdRef = useRef<number | null>(null)
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+
+  const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
 
   useEffect(() => {
     if (!siteKey) return
@@ -118,6 +123,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <Suspense>
+        <GoogleErrorReader onError={setError} />
+      </Suspense>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
