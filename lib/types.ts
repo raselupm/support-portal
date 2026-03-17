@@ -54,6 +54,23 @@ export interface ChatMeta {
   language?: string
 }
 
+export interface DocCategory {
+  id: string
+  name: string
+  createdAt: string
+}
+
+export interface DocArticle {
+  id: string
+  name: string
+  product: string
+  categoryId: string
+  categoryName: string
+  content: string // HTML from TipTap
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ChatMessage {
   id: string
   chatId: string

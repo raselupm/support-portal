@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith('/tickets') || pathname === '/') {
+  if (pathname.startsWith('/tickets')) {
     const cookieValue = request.cookies.get('support_portal_session')?.value
 
     if (!cookieValue) {
@@ -50,5 +50,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/tickets/:path*', '/', '/admin/:path*'],
+  matcher: ['/tickets/:path*', '/admin/:path*'],
 }

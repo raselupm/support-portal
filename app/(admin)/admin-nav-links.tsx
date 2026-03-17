@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Ticket, MessageSquare } from 'lucide-react'
+import { LayoutDashboard, Users, Ticket, MessageSquare, BookOpen } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { Chat } from '@/lib/types'
 
@@ -53,10 +53,12 @@ export default function AdminNavLinks({
         { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/admin/staff', label: 'Staff', icon: Users },
         { href: '/admin/chats', label: 'Chats', icon: MessageSquare, badge: waitingCount },
+        { href: '/admin/docs', label: 'Docs', icon: BookOpen },
       ]
     : [
         { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { href: '/admin/chats', label: 'Chats', icon: MessageSquare, badge: waitingCount },
+        { href: '/admin/docs', label: 'Docs', icon: BookOpen },
       ]
 
   return (

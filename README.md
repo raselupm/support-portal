@@ -26,11 +26,22 @@ A full-featured customer support platform with ticket management and real-time l
   - Snapchat-style notification sounds
   - Chat history persisted across page reloads
 
+### Documentation
+- **Public knowledge base** — browsable at `/` (homepage), no login required
+- **Category pages** — articles grouped by category with article counts
+- **Single article page** — full article with left sidebar (category accordion), right-side table of contents (auto-highlights active section), and breadcrumb navigation
+- **Search** — popup with live filtering by keyword and category filter dropdown
+- **Smart header** — shows logged-in user's name linked to `/profile`, sign out button, and context-aware button ("My Tickets" if logged in, "Open a Ticket" if not); Admin/Staff Panel link shown for staff
+- **CTA block** — "Didn't find what you're looking for?" call-to-action at the bottom of the homepage, category pages, and article pages
+- **Admin doc management** — create, edit, and delete articles and categories from the admin panel (`/admin/docs`)
+- **Chat widget included** — embedded on all public docs pages so visitors can start a chat without logging in
+
 ### Admin Panel
 - **Dashboard** — overview of tickets and activity
 - **Ticket management** — view all tickets, reply, update status, delete
 - **Live chat management** — view all chats (waiting, active, closed), join conversations, close chats
 - **Staff management** — create and manage support staff accounts (admin only)
+- **Docs management** — create and edit knowledge base articles with rich text editor, assign to categories; manage categories
 - **Real-time notifications** — sound + toast alert when a visitor requests chat or a customer replies to a ticket
 - **Waiting chat badge** — live count on Chats nav link via Pusher
 - **Header name link** — header shows display name (not email) and links to `/profile`
@@ -215,12 +226,16 @@ The widget appears as a chat bubble in the bottom-right corner.
 app/
 ├── (auth)/          # Login & OTP verify pages
 ├── (portal)/        # Customer-facing portal (tickets, profile)
-├── (admin)/         # Admin/staff panel (dashboard, chats, staff)
+├── (admin)/         # Admin/staff panel (dashboard, chats, staff, docs)
+├── (docs)/          # Public knowledge base (homepage, category, article pages)
+│   ├── docs-header.tsx   # Shared header component (session-aware, used across all docs + portal)
+│   ├── docs-cta.tsx      # Shared "Didn't find what you're looking for?" CTA block
+│   └── docs/        # Article and category archive pages
 ├── api/             # API routes
 │   ├── auth/        # OTP send/verify, Google OAuth
 │   ├── tickets/     # Ticket CRUD + comments + seen tracking
 │   ├── chat/        # Chat start/send/join/close/typing/seen
-│   ├── admin/       # Admin-only actions
+│   ├── admin/       # Admin-only actions (including docs CRUD)
 │   └── internal/    # Internal endpoints (e.g. delayed email relay)
 public/
 ├── chat-widget.js   # Embeddable chat widget (vanilla JS)
