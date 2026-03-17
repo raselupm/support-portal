@@ -53,6 +53,50 @@
     } catch (e) { /* autoplay policy or unsupported */ }
   }
 
+  function playSystemSound() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      // Soft single ping for join/system events
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } catch (e) { /* autoplay policy or unsupported */ }
+  }
+
+  function playCloseSound() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      // Two descending notes for chat close
+      function playTone(startTime, freq) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+        osc.start(startTime);
+        osc.stop(startTime + 0.3);
+      }
+      playTone(ctx.currentTime, 659);
+      playTone(ctx.currentTime + 0.2, 523);
+    } catch (e) { /* autoplay policy or unsupported */ }
+  }
+
   var _blinkInterval = null;
   var _originalTitle = '';
   function startTitleBlink() {
@@ -425,10 +469,11 @@
     clearBody();
     state.unread = 0;
     badge.style.display = 'none';
+    state.displayedIds = null; // reset so messages re-render into the new DOM
 
     // Messages list
     var msgList = el('div', {
-      flex: '1', overflowY: 'auto', padding: '12px 16px',
+      flex: '1', overflowY: 'auto', padding: '12px 16px 30px',
       display: 'flex', flexDirection: 'column', gap: '10px',
     });
 
@@ -618,6 +663,10 @@
         typingRow.style.display = 'none';
       }, 3000);
     }
+    function hideTyping() {
+      typingRow.style.display = 'none';
+      if (_typingClearTimer) { clearTimeout(_typingClearTimer); _typingClearTimer = null; }
+    }
 
     // Send typing event (throttled to once per 2s)
     var _lastTypingSent = 0;
@@ -650,6 +699,7 @@
     state._msgList = msgList;
     state._appendMessage = appendMessage;
     state._showTyping = showTyping;
+    state._hideTyping = hideTyping;
     state._updateSeenIcons = function (seenAt) {
       var icons = msgList.querySelectorAll('[data-check-for]');
       icons.forEach(function (icon) {
@@ -932,6 +982,8 @@
       state.pusherChannel = state.pusher.subscribe('chat-' + chatId);
 
       state.pusherChannel.bind('new-message', function (msg) {
+        // Skip staff-only system messages (e.g. minimize/maximize events)
+        if (msg.staffOnly) return;
         // Deduplicate
         var exists = state.messages.some(function (m) { return m.id === msg.id; });
         if (exists) return;
@@ -946,7 +998,12 @@
         }
 
         // Notify for staff/system messages
-        if (msg.sender === 'staff' || msg.sender === 'system') {
+        if (msg.sender === 'system') {
+          playSystemSound();
+        } else if (msg.sender === 'staff') {
+          // Immediately hide typing indicator and suppress for 1 second
+          if (state._hideTyping) state._hideTyping();
+          state._suppressTypingUntil = Date.now() + 1000;
           if (state.open && document.hasFocus()) {
             markSeenAsVisitor();
           } else {
@@ -965,6 +1022,7 @@
 
       state.pusherChannel.bind('typing', function (data) {
         if (data.sender !== 'staff') return;
+        if (state._suppressTypingUntil && Date.now() < state._suppressTypingUntil) return;
         if (state.step === 'active' && state.open && state._showTyping) {
           state._showTyping(data.name);
         }
@@ -972,6 +1030,7 @@
 
       state.pusherChannel.bind('status-change', function (data) {
         if (data.status === 'closed') {
+          playCloseSound();
           state.step = 'closed';
           if (state.open) renderClosed();
           return;
@@ -1066,8 +1125,18 @@
     if (state.step === 'button') {
       checkAvailabilityAndOpen();
     } else {
+      sendPresence('maximize');
       showCurrentStep();
     }
+  }
+
+  function sendPresence(event) {
+    if (!state.chatId || !state.token || state.step !== 'active') return;
+    fetch(PORTAL_URL + '/api/chat/' + state.chatId + '/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: state.token, event: event }),
+    }).catch(function () {});
   }
 
   function minimizeWindow() {
@@ -1075,6 +1144,7 @@
     win.style.display = 'none';
     floatBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
     floatBtn.appendChild(badge);
+    sendPresence('minimize');
   }
 
   floatBtn.addEventListener('click', function () {

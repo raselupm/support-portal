@@ -37,6 +37,48 @@ function playNotificationSound() {
   } catch { /* autoplay policy or unsupported */ }
 }
 
+function playSystemSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
+    // Soft single ping for join/system events
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.35)
+  } catch { /* autoplay policy or unsupported */ }
+}
+
+function playCloseSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
+    // Two descending notes for chat close
+    const playTone = (startTime: number, freq: number) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, startTime)
+      gain.gain.setValueAtTime(0, startTime)
+      gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3)
+      osc.start(startTime)
+      osc.stop(startTime + 0.3)
+    }
+    playTone(ctx.currentTime, 659)
+    playTone(ctx.currentTime + 0.2, 523)
+  } catch { /* autoplay policy or unsupported */ }
+}
+
 let _blinkInterval: ReturnType<typeof setInterval> | null = null
 let _originalTitle = ''
 
@@ -122,17 +164,19 @@ export default function StaffChatWindow({
   const [visitorSeenAt, setVisitorSeenAt] = useState<string | undefined>(initialVisitorSeenAt)
   const [showInfo, setShowInfo] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const typingCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const suppressTypingUntilRef = useRef<number>(0)
   const lastTypingSentRef = useRef<number>(0)
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = messagesContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [])
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages, scrollToBottom])
+  }, [messages, visitorTyping, scrollToBottom])
 
   const markSeen = useCallback(() => {
     fetch(`/api/chat/${initialChat.id}/seen`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
@@ -158,7 +202,13 @@ export default function StaffChatWindow({
         if (prev.find((m) => m.id === msg.id)) return prev
         return [...prev, msg]
       })
-      if (msg.sender !== 'staff') {
+      if (msg.sender === 'system') {
+        playSystemSound()
+      } else if (msg.sender !== 'staff') {
+        // Immediately clear typing indicator and suppress it for 1 second
+        setVisitorTyping(null)
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+        suppressTypingUntilRef.current = Date.now() + 1000
         if (document.hasFocus()) {
           markSeen()
         } else {
@@ -175,6 +225,9 @@ export default function StaffChatWindow({
         staffEmail: data.staffEmail ?? prev.staffEmail,
         staffName: data.staffName ?? prev.staffName,
       }))
+      if (data.status === 'closed') {
+        playCloseSound()
+      }
     })
 
     channel.bind('messages-seen', (data: { seenBy: 'visitor' | 'staff'; seenAt: string }) => {
@@ -183,6 +236,7 @@ export default function StaffChatWindow({
 
     channel.bind('typing', (data: { name: string; sender: 'visitor' | 'staff' }) => {
       if (data.sender !== 'visitor') return
+      if (Date.now() < suppressTypingUntilRef.current) return
       setVisitorTyping(data.name)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
       typingTimeoutRef.current = setTimeout(() => setVisitorTyping(null), 3000)
@@ -284,7 +338,7 @@ export default function StaffChatWindow({
     }
   }
 
-  const displayName = chat.visitorName || chat.visitorEmail
+  const displayName = chat.visitorName
 
   return (
     <div className="flex gap-4 h-[calc(100vh-7rem)] md:h-[calc(100vh-8rem)] max-h-[800px]">
@@ -351,7 +405,7 @@ export default function StaffChatWindow({
         </div>
 
         {/* Messages area */}
-        <div className="flex-1 bg-white border border-gray-200 border-t-0 border-b-0 overflow-y-auto px-5 py-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 bg-white border border-gray-200 border-t-0 border-b-0 overflow-y-auto px-5 py-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center text-gray-400 text-sm py-8">No messages yet.</div>
           )}

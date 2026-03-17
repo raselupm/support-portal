@@ -25,11 +25,12 @@ export async function sendTicketReplyEmail(
   to: string,
   ticket: { id: string; title: string },
   repliedBy: 'staff' | 'customer',
-  replierName: string
+  replierName: string,
+  commentContent: string
 ): Promise<void> {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const ticketUrl = `${baseUrl}/tickets/${ticket.id}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const ticketUrl = `${appUrl}/tickets/${ticket.id}`
 
   const isStaffReply = repliedBy === 'staff'
   const intro = isStaffReply
@@ -60,14 +61,26 @@ export async function sendTicketReplyEmail(
               <p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.5;">${intro}</p>
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:8px;margin-bottom:24px;border:1px solid #e5e7eb;">
                 <tr>
-                  <td style="padding:16px 20px;">
+                  <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
                     <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">Ticket</p>
                     <p style="margin:0;font-size:14px;color:#111827;font-weight:500;">${ticket.title}</p>
                   </td>
                 </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
+                    <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">From</p>
+                    <p style="margin:0;font-size:14px;color:#111827;">${replierName}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">Message</p>
+                    <div style="font-size:14px;color:#111827;line-height:1.6;">${commentContent}</div>
+                  </td>
+                </tr>
               </table>
               <a href="${ticketUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:6px;">
-                View Reply →
+                View Ticket →
               </a>
             </td>
           </tr>
@@ -104,11 +117,11 @@ export async function sendTicketReplyEmail(
 
 export async function sendNewTicketEmail(
   to: string,
-  ticket: { id: string; title: string; product: string; userEmail: string; userName: string }
+  ticket: { id: string; title: string; product: string; userEmail: string; userName: string; description: string }
 ): Promise<void> {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-  const ticketUrl = `${baseUrl}/admin/tickets/${ticket.id}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+  const ticketUrl = `${appUrl}/admin/tickets/${ticket.id}`
 
   const html = `
 <!DOCTYPE html>
@@ -148,9 +161,15 @@ export async function sendNewTicketEmail(
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:16px 20px;">
+                  <td style="padding:16px 20px;border-bottom:1px solid #e5e7eb;">
                     <p style="margin:0 0 2px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">From</p>
                     <p style="margin:0;font-size:14px;color:#111827;">${ticket.userName}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;">Description</p>
+                    <div style="font-size:14px;color:#111827;line-height:1.6;">${ticket.description}</div>
                   </td>
                 </tr>
               </table>

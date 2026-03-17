@@ -176,7 +176,7 @@ export default function ChatListClient({ initialChats, isAdmin }: { initialChats
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {chat.status === 'closed' ? 'View' : 'Join Chat'}
+                    View
                   </Link>
                   {isAdmin && (
                     <button

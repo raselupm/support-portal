@@ -96,7 +96,7 @@ export async function POST(
       }
       sender = 'visitor'
       senderEmail = chat.visitorEmail
-      senderName = chat.visitorEmail
+      senderName = chat.visitorName
 
       // Rate limit: max visitor messages per second
       const msgLimit = parseInt(process.env.MAX_CHAT_MESSAGES_PER_SECOND || '3', 10)

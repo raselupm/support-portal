@@ -14,6 +14,7 @@ const SLEEP_CHUNK = 50_000 // 50s per hop
 export interface TicketNotifyPayload {
   ticketId: string
   commentId: string
+  commentContent: string
   isStaff: boolean
   commentCreatedAt: string
   recipientEmails: string[]
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Time is up — check seen and send email
-      const { ticketId, isStaff, commentCreatedAt, recipientEmails, authorName } = payload
+      const { ticketId, commentContent, isStaff, commentCreatedAt, recipientEmails, authorName } = payload
 
       const ticket = await redis.get<Ticket>(`ticket:${ticketId}`)
       if (!ticket) return
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
         if (!wasSeen) {
           const userRecord = await redis.get<User>(`user:${ticket.userEmail}`)
           if (userRecord?.receiveEmailNotifications !== false) {
-            await sendTicketReplyEmail(ticket.userEmail, ticket, 'staff', authorName)
+            await sendTicketReplyEmail(ticket.userEmail, ticket, 'staff', authorName, commentContent)
             emailSent = true
           }
         }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
             recipientEmails.map(async (email) => {
               const record = await redis.get<User>(`user:${email}`)
               if (record?.receiveNewTicketEmails !== false) {
-                await sendTicketReplyEmail(email, ticket, 'customer', authorName)
+                await sendTicketReplyEmail(email, ticket, 'customer', authorName, commentContent)
                 return true
               }
               return false

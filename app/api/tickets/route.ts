@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
           .filter(Boolean)
         const allStaffEmails = [...new Set([...staffEmails, ...adminEmails])]
 
-        const ticketPayload = { id: ticket.id, title: ticket.title, product: ticket.product, userEmail: ticket.userEmail, userName }
+        const ticketPayload = { id: ticket.id, title: ticket.title, product: ticket.product, userEmail: ticket.userEmail, userName, description: ticket.description }
 
         await Promise.allSettled(
           allStaffEmails.map(async (staffEmail) => {

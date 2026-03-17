@@ -62,4 +62,5 @@ export interface ChatMessage {
   senderName: string
   content: string
   createdAt: string
+  staffOnly?: boolean
 }

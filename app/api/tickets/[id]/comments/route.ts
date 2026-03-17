@@ -104,6 +104,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const payload: TicketNotifyPayload = {
           ticketId: id,
           commentId: comment.id,
+          commentContent: comment.content,
           isStaff: staff,
           commentCreatedAt: now,
           recipientEmails,
