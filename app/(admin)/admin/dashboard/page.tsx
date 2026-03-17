@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Ticket, StaffMember, Chat } from '@/lib/types'
+import { Ticket, StaffMember, Chat, DocArticle, DocCategory } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
-import { TicketIcon, MessageSquare, CheckCircle, LayoutDashboard, MessagesSquare, Clock, ActivitySquare, XCircle } from 'lucide-react'
+import { TicketIcon, MessageSquare, CheckCircle, LayoutDashboard, MessagesSquare, Clock, ActivitySquare, XCircle, BookOpen, FolderOpen } from 'lucide-react'
 import Link from 'next/link'
 import StatusBadge from '@/components/status-badge'
 import WeeklyChart from './weekly-chart'
@@ -19,7 +19,7 @@ interface StatCardProps {
 function StatCard({ label, value, icon, colorClass }: StatCardProps) {
   return (
     <div className={`bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4`}>
-      <div className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+      <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
         {icon}
       </div>
       <div>
@@ -123,6 +123,18 @@ export default async function DashboardPage() {
     if (chat) recentChats.push(chat)
   }
 
+  // 6. Docs counts + recent 5 articles
+  const [allArticleIds, allCategoryIds] = await Promise.all([
+    redis.zrange('doc_articles', 0, -1) as Promise<string[]>,
+    redis.zrange('doc_categories', 0, -1) as Promise<string[]>,
+  ])
+  const docCounts = { articles: allArticleIds.length, categories: allCategoryIds.length }
+
+  const recentArticleIds = (await redis.zrange('doc_articles', 0, 4, { rev: true })) as string[]
+  const recentArticles = (
+    await Promise.all(recentArticleIds.map((id) => redis.get<DocArticle>(`doc_article:${id}`)))
+  ).filter(Boolean) as DocArticle[]
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -192,6 +204,25 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Docs stat cards */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Documentation</p>
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard
+              label="Articles"
+              value={docCounts.articles}
+              icon={<BookOpen className="w-5 h-5 text-indigo-600" />}
+              colorClass="bg-indigo-50"
+          />
+          <StatCard
+              label="Categories"
+              value={docCounts.categories}
+              icon={<FolderOpen className="w-5 h-5 text-violet-600" />}
+              colorClass="bg-violet-50"
+          />
+        </div>
+      </div>
+
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Weekly chart */}
@@ -232,90 +263,121 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent chats */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-700">Recent Chats</h2>
-          <Link href="/admin/chats" className="text-xs text-blue-600 hover:underline">View all</Link>
-        </div>
-        {recentChats.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No chats yet.</p>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {recentChats.map((chat) => (
-              <div key={chat.id} className="py-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <Link
-                    href={`/admin/chats/${chat.id}`}
-                    className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors block truncate"
-                  >
-                    {chat.visitorName || chat.visitorEmail}
-                  </Link>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400 truncate">{chat.visitorEmail}</span>
-                    <span className="text-xs text-gray-300">·</span>
-                    <span className="text-xs text-gray-400">
-                      {formatDistanceToNow(new Date(chat.createdAt), { addSuffix: true })}
-                    </span>
-                  </div>
-                </div>
-                <span className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  chat.status === 'waiting'
-                    ? 'bg-orange-100 text-orange-700'
-                    : chat.status === 'active'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                }`}>
-                  {chat.status === 'waiting' ? 'Waiting' : chat.status === 'active' ? 'Active' : 'Closed'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Recent chats · Recent articles · Staff performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-      {/* Staff performance table */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Staff Performance This Week</h2>
-        {staffPerf.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">
-            No staff members yet.{' '}
-            <Link href="/admin/staff" className="text-blue-600 hover:underline">
-              Add staff
-            </Link>
-          </p>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide pb-3">
-                  Name
-                </th>
-                <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide pb-3">
-                  Email
-                </th>
-                <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide pb-3">
-                  Replies This Week
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+        {/* Recent chats */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700">Recent Chats</h2>
+            <Link href="/admin/chats" className="text-xs text-blue-600 hover:underline">View all</Link>
+          </div>
+          {recentChats.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No chats yet.</p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {recentChats.map((chat) => (
+                <div key={chat.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/admin/chats/${chat.id}`}
+                      className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors block truncate"
+                    >
+                      {chat.visitorName || chat.visitorEmail}
+                    </Link>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-400 truncate">{chat.visitorEmail}</span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">
+                        {formatDistanceToNow(new Date(chat.createdAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    chat.status === 'waiting'
+                      ? 'bg-orange-100 text-orange-700'
+                      : chat.status === 'active'
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {chat.status === 'waiting' ? 'Waiting' : chat.status === 'active' ? 'Active' : 'Closed'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent articles */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-700">Recent Articles</h2>
+            <Link href="/admin/docs" className="text-xs text-blue-600 hover:underline">View all</Link>
+          </div>
+          {recentArticles.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">
+              No articles yet.{' '}
+              <Link href="/admin/docs/new" className="text-blue-600 hover:underline">Create one</Link>
+            </p>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {recentArticles.map((article) => (
+                <div key={article.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/admin/docs/${article.id}/edit`}
+                      className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors block truncate"
+                    >
+                      {article.name}
+                    </Link>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-400">{article.categoryName}</span>
+                      <span className="text-xs text-gray-300">·</span>
+                      <span className="text-xs text-gray-400">
+                        {formatDistanceToNow(new Date(article.updatedAt), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/docs/${article.id}`}
+                    target="_blank"
+                    className="shrink-0 text-xs text-gray-400 hover:text-blue-600 transition"
+                  >
+                    View ↗
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Staff performance */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Staff Performance This Week</h2>
+          {staffPerf.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              No staff members yet.{' '}
+              <Link href="/admin/staff" className="text-blue-600 hover:underline">Add staff</Link>
+            </p>
+          ) : (
+            <div className="divide-y divide-gray-50">
               {staffPerf
                 .sort((a, b) => b.repliesThisWeek - a.repliesThisWeek)
                 .map((member) => (
-                  <tr key={member.email}>
-                    <td className="py-3 text-sm font-medium text-gray-900">{member.name}</td>
-                    <td className="py-3 text-sm text-gray-500">{member.email}</td>
-                    <td className="py-3 text-right">
-                      <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-sm font-semibold bg-blue-50 text-blue-700">
-                        {member.repliesThisWeek}
-                      </span>
-                    </td>
-                  </tr>
+                  <div key={member.email} className="py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{member.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{member.email}</p>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center justify-center min-w-8 px-2 py-0.5 rounded-full text-sm font-semibold bg-blue-50 text-blue-700">
+                      {member.repliesThisWeek}
+                    </span>
+                  </div>
                 ))}
-            </tbody>
-          </table>
-        )}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )
