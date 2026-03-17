@@ -42,6 +42,7 @@ function ProgressBarInner() {
       const href = anchor.getAttribute('href') ?? ''
       // Skip external, hash-only, or same-page links
       if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('mailto')) return
+      if (anchor.target === '_blank') return
       if (href === pathname) return
       startProgress()
     }

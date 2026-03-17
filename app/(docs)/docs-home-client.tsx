@@ -229,7 +229,7 @@ export default function DocsHomeClient({
         />
       )}
 
-      <div className="min-h-screen bg-gray-50">
+      <div className="flex-1 bg-gray-50">
         {/* Hero */}
         <section className="relative overflow-hidden">
           {/* Gradient base */}
@@ -254,9 +254,6 @@ export default function DocsHomeClient({
             >
               <Search className="w-4 h-4 flex-shrink-0 text-gray-400" />
               <span className="flex-1">Search documentation…</span>
-              <kbd className="hidden sm:inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                Esc
-              </kbd>
             </button>
           </div>
         </section>

@@ -40,7 +40,7 @@ export default async function CategoryArchivePage({ params }: { params: Promise<
   return (
     <>
       <DocsHeader appName={appName} />
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex-1 bg-gray-50">
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs text-gray-400 mb-6">
