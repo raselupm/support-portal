@@ -204,7 +204,7 @@
   });
   var winTitle = el('span', { color: 'white', fontWeight: '600', fontSize: '14px' }, { textContent: 'Support Chat' });
   var btnStyle = { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.8)', padding: '4px', lineHeight: '1', borderRadius: '6px', transition: 'background 0.15s' };
-  var minimizeBtn = el('button', Object.assign({}, btnStyle));
+  var minimizeBtn = el('button', Object.assign({}, btnStyle, { display: 'none' }));
   minimizeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
   minimizeBtn.title = 'Minimize';
   minimizeBtn.addEventListener('mouseover', function () { minimizeBtn.style.background = 'rgba(255,255,255,0.15)'; });
@@ -230,6 +230,7 @@
   // ---- Step renderers ----
   function clearBody() {
     while (winBody.firstChild) winBody.removeChild(winBody.firstChild);
+    minimizeBtn.style.display = state.step === 'active' ? 'block' : 'none';
   }
 
   // ---- Offline state ----
