@@ -141,6 +141,8 @@
     open: false,
     unread: 0,
     staffSeenAt: null, // ISO string — when staff last read messages
+    activeTab: 'home',  // 'home' | 'ask'
+    homeView: 'browse', // 'browse' | 'article'
   };
 
   // ---- DOM helpers ----
@@ -191,7 +193,7 @@
     background: C.bg, borderRadius: '16px',
     boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
     display: 'none', flexDirection: 'column',
-    overflow: 'hidden', border: '1px solid ' + C.border,
+    overflow: 'hidden',
     zIndex: '2147483646',
   });
   root.appendChild(win);
@@ -204,6 +206,19 @@
   });
   var winTitle = el('span', { color: 'white', fontWeight: '600', fontSize: '14px' }, { textContent: 'Support Chat' });
   var btnStyle = { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.8)', padding: '4px', lineHeight: '1', borderRadius: '6px', transition: 'background 0.15s' };
+
+  // Back button — shown when viewing an article
+  var backBtn = el('button', Object.assign({}, btnStyle, { display: 'none', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '500' }));
+  backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+  backBtn.addEventListener('mouseover', function () { backBtn.style.background = 'rgba(255,255,255,0.15)'; });
+  backBtn.addEventListener('mouseout',  function () { backBtn.style.background = 'none'; });
+  backBtn.addEventListener('click', function () {
+    state.homeView = 'browse';
+    winTitle.style.display = '';
+    backBtn.style.display = 'none';
+    renderHome();
+  });
+
   var minimizeBtn = el('button', Object.assign({}, btnStyle, { display: 'none' }));
   minimizeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
   minimizeBtn.title = 'Minimize';
@@ -216,10 +231,14 @@
   closeWinBtn.addEventListener('mouseover', function () { closeWinBtn.style.background = 'rgba(255,255,255,0.15)'; });
   closeWinBtn.addEventListener('mouseout',  function () { closeWinBtn.style.background = 'none'; });
 
+  var headerLeft = el('div', { display: 'flex', alignItems: 'center', gap: '4px' });
+  headerLeft.appendChild(backBtn);
+  headerLeft.appendChild(winTitle);
+
   var headerBtns = el('div', { display: 'flex', alignItems: 'center', gap: '2px' });
   headerBtns.appendChild(minimizeBtn);
   headerBtns.appendChild(closeWinBtn);
-  winHeader.appendChild(winTitle);
+  winHeader.appendChild(headerLeft);
   winHeader.appendChild(headerBtns);
   win.appendChild(winHeader);
 
@@ -227,10 +246,251 @@
   var winBody = el('div', { flex: '1', overflow: 'hidden', display: 'flex', flexDirection: 'column' });
   win.appendChild(winBody);
 
+  // Tab bar
+  var tabBar = el('div', {
+    display: 'flex', borderTop: '1px solid ' + C.border, flexShrink: '0', background: C.bg,
+  });
+
+  function makeTabBtn(labelText, svgHtml, tabName) {
+    var btn = el('button', {
+      flex: '1', display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: '3px', padding: '8px 0 6px', border: 'none',
+      background: 'none', cursor: 'pointer', fontSize: '11px', fontWeight: '500',
+      color: C.textSecondary, transition: 'color 0.15s', borderTop: '2px solid transparent',
+    });
+    var iconWrap = el('div', { lineHeight: '1' });
+    iconWrap.innerHTML = svgHtml;
+    var labelEl = el('span', {}, { textContent: labelText });
+    btn.appendChild(iconWrap);
+    btn.appendChild(labelEl);
+    btn.addEventListener('click', function () {
+      state.homeView = 'browse';
+      winTitle.style.display = '';
+      backBtn.style.display = 'none';
+      state.activeTab = tabName;
+      updateTabBar();
+      if (tabName === 'home') {
+        renderHome();
+      } else {
+        state.unread = 0;
+        badge.style.display = 'none';
+        if (state.step === 'button' || state.step === 'offline') {
+          checkAvailabilityAndOpen();
+        } else {
+          sendPresence('maximize');
+          showCurrentStep();
+        }
+      }
+    });
+    return btn;
+  }
+
+  var homeTabBtn = makeTabBtn('Home',
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    'home');
+  var askTabBtn = makeTabBtn('Ask',
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    'ask');
+
+  tabBar.appendChild(homeTabBtn);
+  tabBar.appendChild(askTabBtn);
+  win.appendChild(tabBar);
+
+  function updateTabBar() {
+    [homeTabBtn, askTabBtn].forEach(function (btn) { btn.style.color = C.textSecondary; btn.style.borderTopColor = 'transparent'; });
+    var active = state.activeTab === 'home' ? homeTabBtn : askTabBtn;
+    active.style.color = C.primary;
+    active.style.borderTopColor = C.primary;
+  }
+
   // ---- Step renderers ----
   function clearBody() {
     while (winBody.firstChild) winBody.removeChild(winBody.firstChild);
     minimizeBtn.style.display = state.step === 'active' ? 'block' : 'none';
+    // Reset header to normal when not in article view
+    if (state.homeView !== 'article') {
+      winTitle.style.display = '';
+      backBtn.style.display = 'none';
+    }
+  }
+
+  // ---- Home tab ----
+  function renderHome() {
+    state.homeView = 'browse';
+    clearBody();
+    winTitle.style.display = '';
+    backBtn.style.display = 'none';
+
+    // Hero (blue section)
+    var hero = el('div', {
+      background: C.primary, padding: '24px 16px 52px', position: 'relative', flexShrink: '0',
+    });
+    var h1 = el('h2', {
+      color: 'white', fontSize: '20px', fontWeight: '700', margin: '0 0 6px', lineHeight: '1.3',
+    }, { textContent: 'Here To Help' });
+    var desc = el('p', {
+      color: 'rgba(255,255,255,0.85)', fontSize: '13px', margin: '0', lineHeight: '1.5',
+    }, { textContent: 'Looking for a quick solution? Get an instant answer at your fingertips.' });
+
+    // Search bar — straddles blue/white boundary
+    var searchWrap = el('div', {
+      position: 'absolute', bottom: '-21px', left: '16px', right: '16px',
+      background: 'white', borderRadius: '25px',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+      display: 'flex', alignItems: 'center',
+      border: '1px solid ' + C.border, overflow: 'hidden',
+    });
+    var searchInput = el('input', {
+      flex: '1', padding: '10px 12px', border: 'none', outline: 'none',
+      fontSize: '13px', background: 'transparent', color: C.textPrimary,
+    });
+    searchInput.setAttribute('placeholder', 'Search articles...');
+    var searchBtn = el('button', {
+      padding: '13px', background: C.primary, border: 'none',
+      cursor: 'pointer', color: 'white', flexShrink: '0',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '25px'
+    });
+    searchBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+    searchWrap.appendChild(searchInput);
+    searchWrap.appendChild(searchBtn);
+    hero.appendChild(h1);
+    hero.appendChild(desc);
+    hero.appendChild(searchWrap);
+    winBody.appendChild(hero);
+
+    // Articles section
+    var articlesSection = el('div', {
+      flex: '1', overflowY: 'auto', paddingTop: '30px',
+    });
+    var docsHeading = el('div', {
+      padding: '8px 16px 6px', fontSize: '11px', fontWeight: '600',
+      color: C.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em',
+    }, { textContent: 'Docs' });
+    articlesSection.appendChild(docsHeading);
+
+    var listEl = el('div', {});
+    var spinnerEl = el('div', { padding: '24px 16px', display: 'flex', justifyContent: 'center' });
+    spinnerEl.innerHTML = '<div style="width:22px;height:22px;border:2px solid ' + C.border + ';border-top-color:' + C.primary + ';border-radius:50%;animation:sp-spin 0.8s linear infinite"></div>';
+    listEl.appendChild(spinnerEl);
+    articlesSection.appendChild(listEl);
+    winBody.appendChild(articlesSection);
+
+    function loadArticles(q) {
+      while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+      var sp = el('div', { padding: '24px 16px', display: 'flex', justifyContent: 'center' });
+      sp.innerHTML = '<div style="width:22px;height:22px;border:2px solid ' + C.border + ';border-top-color:' + C.primary + ';border-radius:50%;animation:sp-spin 0.8s linear infinite"></div>';
+      listEl.appendChild(sp);
+      var url = PORTAL_URL + '/api/docs/articles?limit=10' + (q ? '&q=' + encodeURIComponent(q) : '');
+      fetch(url)
+        .then(function (r) { return r.json(); })
+        .then(function (articles) {
+          listEl.removeChild(sp);
+          if (!articles || articles.length === 0) {
+            var empty = el('div', { padding: '20px 16px', textAlign: 'center', color: C.textSecondary, fontSize: '13px' },
+              { textContent: q ? 'No results found.' : 'No articles available.' });
+            listEl.appendChild(empty);
+            return;
+          }
+          articles.forEach(function (article) { listEl.appendChild(makeArticleCard(article)); });
+        })
+        .catch(function () {
+          if (listEl.contains(sp)) listEl.removeChild(sp);
+          var errEl = el('div', { padding: '20px 16px', textAlign: 'center', color: '#ef4444', fontSize: '13px' },
+            { textContent: 'Failed to load articles.' });
+          listEl.appendChild(errEl);
+        });
+    }
+
+    loadArticles('');
+
+    function doSearch() {
+      var q = searchInput.value.trim();
+      docsHeading.textContent = q ? 'Results' : 'Docs';
+      loadArticles(q);
+    }
+    searchBtn.addEventListener('click', doSearch);
+    searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
+  }
+
+  function makeArticleCard(article) {
+    var card = el('div', {
+      display: 'flex', alignItems: 'center', padding: '11px 16px',
+      borderBottom: '1px solid ' + C.border, cursor: 'pointer', gap: '10px',
+      transition: 'background 0.15s',
+    });
+    var cardContent = el('div', { flex: '1', minWidth: '0' });
+    var titleEl = el('div', {
+      fontSize: '13px', fontWeight: '600', color: C.textPrimary, marginBottom: '3px',
+      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    }, { textContent: article.name });
+
+    // Strip HTML for preview
+    var tmpDiv = document.createElement('div');
+    tmpDiv.innerHTML = article.content || '';
+    var plainText = (tmpDiv.textContent || tmpDiv.innerText || '').replace(/\s+/g, ' ').trim();
+    var previewEl = el('div', { fontSize: '12px', color: C.textSecondary, lineHeight: '1.4' });
+    previewEl.textContent = plainText.length > 120 ? plainText.slice(0, 120) + '…' : plainText;
+    previewEl.style.cssText += ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
+
+    cardContent.appendChild(titleEl);
+    cardContent.appendChild(previewEl);
+
+    var arrow = el('div', { flexShrink: '0', color: C.textSecondary, lineHeight: '1' });
+    arrow.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+
+    card.appendChild(cardContent);
+    card.appendChild(arrow);
+    card.addEventListener('mouseover', function () { card.style.background = C.surface; });
+    card.addEventListener('mouseout',  function () { card.style.background = ''; });
+    card.addEventListener('click', function () { openArticle(article.id); });
+    return card;
+  }
+
+  function openArticle(id) {
+    // Show spinner while loading
+    while (winBody.firstChild) winBody.removeChild(winBody.firstChild);
+    winTitle.style.display = 'none';
+    backBtn.style.display = 'flex';
+    var spinWrap = el('div', { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' });
+    spinWrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid ' + C.border + ';border-top-color:' + C.primary + ';border-radius:50%;animation:sp-spin 0.8s linear infinite"></div>';
+    winBody.appendChild(spinWrap);
+
+    fetch(PORTAL_URL + '/api/docs/articles/' + encodeURIComponent(id))
+      .then(function (r) { return r.json(); })
+      .then(function (article) { renderArticle(article); })
+      .catch(function () {
+        if (winBody.contains(spinWrap)) winBody.removeChild(spinWrap);
+        var errEl = el('div', { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', color: '#ef4444', fontSize: '13px', textAlign: 'center' },
+          { textContent: 'Failed to load article.' });
+        winBody.appendChild(errEl);
+      });
+  }
+
+  function renderArticle(article) {
+    while (winBody.firstChild) winBody.removeChild(winBody.firstChild);
+    state.homeView = 'article';
+    winTitle.style.display = 'none';
+    backBtn.style.display = 'flex';
+
+    var container = el('div', { flex: '1', overflowY: 'auto', padding: '16px 18px 24px' });
+    var titleEl = el('h2', {
+      fontSize: '17px', fontWeight: '700', color: C.textPrimary, margin: '0 0 14px', lineHeight: '1.35',
+    }, { textContent: article.name });
+    var contentEl = el('div', { fontSize: '14px', lineHeight: '1.75', color: C.textPrimary });
+    contentEl.innerHTML = article.content || '';
+
+    // Basic content styles via a <style> scoped to the content
+    var styleTag = document.createElement('style');
+    styleTag.textContent = '.sp-article-content p{margin:0 0 10px} .sp-article-content h1,.sp-article-content h2,.sp-article-content h3{margin:16px 0 6px;font-weight:600} .sp-article-content ul,.sp-article-content ol{padding-left:20px;margin:0 0 10px} .sp-article-content pre{background:#f3f4f6;padding:10px;border-radius:6px;overflow-x:auto;font-size:12px} .sp-article-content code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}';
+    contentEl.classList.add('sp-article-content');
+
+    container.appendChild(titleEl);
+    container.appendChild(contentEl);
+    winBody.appendChild(container);
+    if (!document.querySelector('style[data-sp-article]')) {
+      styleTag.setAttribute('data-sp-article', '1');
+      document.head.appendChild(styleTag);
+    }
   }
 
   // ---- Offline state ----
@@ -524,10 +784,11 @@
       }
 
       var bubble = el('div', {
-        padding: '8px 12px', borderRadius: '14px', fontSize: '13px',
+        padding: '8px 12px', borderRadius: '14px', fontSize: '15px',
         maxWidth: '75%', lineHeight: '1.5', wordBreak: 'break-word',
+        whiteSpace: 'pre-wrap',
         background: isVisitor ? C.primary : C.surface,
-        color: isVisitor ? 'white' : C.textPrimary,
+        color: isVisitor ? '#fff' : C.textPrimary,
         borderBottomRightRadius: isVisitor ? '4px' : '14px',
         borderBottomLeftRadius: isVisitor ? '14px' : '4px',
         border: isVisitor ? 'none' : '1px solid ' + C.border,
@@ -559,33 +820,42 @@
 
     // Input area
     var inputRow = el('div', {
-      display: 'flex', gap: '8px', padding: '12px 12px 14px',
+      display: 'flex', padding: '12px 12px 14px',
       borderTop: '1px solid ' + C.border, background: C.bg, flexShrink: '0',
     });
 
+    var inputWrapper = el('div', {
+      display: 'flex', flex: '1', alignItems: 'flex-end',
+      border: '1px solid ' + C.border, borderRadius: '10px',
+      overflow: 'hidden', background: C.bg,
+    });
+
     var textInput = el('textarea', {
-      flex: '1', padding: '8px 10px', border: '1px solid ' + C.border,
-      borderRadius: '10px', fontSize: '13px', resize: 'none',
+      flex: '1', padding: '8px 10px', border: 'none',
+      fontSize: '15px', resize: 'none',
       fontFamily: 'inherit', outline: 'none', color: C.textPrimary,
-      lineHeight: '1.4',
+      lineHeight: '1.4', background: 'transparent',
+      maxHeight: '200px', overflowY: 'auto', boxSizing: 'border-box',
     });
     textInput.setAttribute('placeholder', 'Type a message...');
-    textInput.setAttribute('rows', '2');
+    textInput.setAttribute('rows', '1');
 
     var sendBtn = el('button', {
-      padding: '8px 14px', background: C.primary, color: 'white',
-      border: 'none', borderRadius: '10px', fontSize: '13px',
-      fontWeight: '600', cursor: 'pointer', alignSelf: 'flex-end',
-      transition: 'background 0.2s', flexShrink: '0',
-    }, { textContent: 'Send' });
-    sendBtn.addEventListener('mouseover', function () { sendBtn.style.background = C.primaryHover; });
-    sendBtn.addEventListener('mouseout', function () { sendBtn.style.background = C.primary; });
+      background: 'none', border: 'none', cursor: 'pointer',
+      padding: '0 10px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', flexShrink: '0', alignSelf: 'stretch',
+      opacity: '0.6', transition: 'opacity 0.2s',
+    });
+    sendBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + C.primary + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
 
     function doSend() {
       var content = textInput.value.trim();
       if (!content) return;
       sendBtn.disabled = true;
+      sendBtn.style.opacity = '0.6';
       textInput.value = '';
+      textInput.style.height = 'auto';
+      textInput.style.overflowY = 'hidden';
 
       var tempId = 'temp-' + Date.now();
       var tempMsg = {
@@ -683,13 +953,23 @@
     }
 
     sendBtn.addEventListener('click', doSend);
-    textInput.addEventListener('input', sendTypingEvent);
+    function autoGrow() {
+      textInput.style.height = 'auto';
+      textInput.style.height = Math.min(textInput.scrollHeight, 200) + 'px';
+      textInput.style.overflowY = textInput.scrollHeight > 200 ? 'auto' : 'hidden';
+    }
+    textInput.addEventListener('input', function () {
+      autoGrow();
+      sendBtn.style.opacity = textInput.value.trim() ? '1' : '0.6';
+      sendTypingEvent();
+    });
     textInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
     });
 
-    inputRow.appendChild(textInput);
-    inputRow.appendChild(sendBtn);
+    inputWrapper.appendChild(textInput);
+    inputWrapper.appendChild(sendBtn);
+    inputRow.appendChild(inputWrapper);
     winBody.appendChild(msgList);
     winBody.appendChild(typingRow);
     winBody.appendChild(inputRow);
@@ -990,10 +1270,10 @@
         if (exists) return;
         state.messages.push(msg);
 
-        if (state.step === 'active' && state.open && state._appendMessage && state._msgList) {
+        if (state.step === 'active' && state.open && state.activeTab === 'ask' && state._appendMessage && state._msgList) {
           state._appendMessage(msg);
           state._msgList.scrollTop = state._msgList.scrollHeight;
-        } else if (!state.open) {
+        } else if (!state.open || state.activeTab !== 'ask') {
           state.unread++;
           badge.style.display = 'block';
         }
@@ -1095,6 +1375,8 @@
   function checkAvailabilityAndOpen() {
     // If already in a live chat, skip availability check
     if (state.chatId && state.token) {
+      state.activeTab = 'ask';
+      updateTabBar();
       showCurrentStep();
       return;
     }
@@ -1106,11 +1388,14 @@
         } else {
           state.step = 'offline';
         }
+        state.activeTab = 'ask';
+        updateTabBar();
         showCurrentStep();
       })
       .catch(function () {
-        // On network error default to showing email form
         if (state.step === 'button' || state.step === 'offline') state.step = 'email';
+        state.activeTab = 'ask';
+        updateTabBar();
         showCurrentStep();
       });
   }
@@ -1123,11 +1408,17 @@
     floatBtn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
     floatBtn.appendChild(badge);
 
-    if (state.step === 'button') {
-      checkAvailabilityAndOpen();
+    updateTabBar();
+
+    if (state.activeTab === 'home') {
+      renderHome();
     } else {
-      sendPresence('maximize');
-      showCurrentStep();
+      if (state.step === 'button' || state.step === 'offline') {
+        checkAvailabilityAndOpen();
+      } else {
+        sendPresence('maximize');
+        showCurrentStep();
+      }
     }
   }
 

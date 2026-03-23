@@ -168,6 +168,7 @@ export default function StaffChatWindow({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const suppressTypingUntilRef = useRef<number>(0)
   const lastTypingSentRef = useRef<number>(0)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const scrollToBottom = useCallback(() => {
     const el = messagesContainerRef.current
@@ -282,6 +283,10 @@ export default function StaffChatWindow({
 
     setSending(true)
     setInput('')
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.overflowY = 'hidden'
+    }
 
     const tempId = `temp-${Date.now()}-${Math.random()}`
     const optimistic: DisplayMessage = {
@@ -446,7 +451,7 @@ export default function StaffChatWindow({
                   )}
                 </div>
                 <div
-                  className={`px-4 py-2.5 rounded-2xl text-sm max-w-[75%] ${
+                  className={`px-4 py-2.5 rounded-2xl text-sm max-w-[75%] whitespace-pre-wrap break-words ${
                     msg.failed
                       ? 'bg-red-50 text-red-700 border border-red-200'
                       : isStaffMsg
@@ -511,19 +516,28 @@ export default function StaffChatWindow({
           )}
 
           {chat.status === 'active' && (
-            <div className="flex gap-2">
+            <div className="flex items-end border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
               <textarea
+                ref={textareaRef}
                 value={input}
-                onChange={(e) => { setInput(e.target.value); sendTyping() }}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  sendTyping()
+                  const ta = e.target
+                  ta.style.height = 'auto'
+                  ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'
+                  ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden'
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message... (Enter to send)"
-                rows={2}
-                className="flex-1 resize-none border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={1}
+                className="flex-1 resize-none border-none outline-none px-3 py-2.5 text-sm bg-transparent overflow-hidden"
+                style={{ maxHeight: 200 }}
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || sending}
-                className="self-end flex-shrink-0 p-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="self-end flex-shrink-0 p-2.5 text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
               >
                 <Send className="w-4 h-4" />
               </button>
