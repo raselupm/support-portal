@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const existing = await redis.get<DocArticle>(`doc_article:${id}`)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { name, product, categoryId, content } = await request.json()
+  const { name, product, categoryId, content, order } = await request.json()
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'Name is required.' }, { status: 400 })
@@ -54,6 +54,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     categoryId,
     categoryName: category.name,
     content,
+    order: typeof order === 'number' ? order : (existing.order ?? 0),
     updatedAt: new Date().toISOString(),
   }
 

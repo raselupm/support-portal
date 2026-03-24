@@ -24,5 +24,6 @@ export async function GET(request: NextRequest) {
     if (articles.length >= limit) break
   }
 
+  articles.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   return NextResponse.json(articles)
 }

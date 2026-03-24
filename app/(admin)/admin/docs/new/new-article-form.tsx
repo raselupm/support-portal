@@ -24,6 +24,7 @@ export default function NewArticleForm({
   const [product, setProduct] = useState(products[0] || '')
   const [categoryId, setCategoryId] = useState(categories[0]?.id || '')
   const [content, setContent] = useState('')
+  const [order, setOrder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -42,7 +43,7 @@ export default function NewArticleForm({
       const res = await fetch('/api/admin/docs/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, product, categoryId, content }),
+        body: JSON.stringify({ name, product, categoryId, content, order }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to save article.'); return }
@@ -113,6 +114,18 @@ export default function NewArticleForm({
               ))}
             </select>
           )}
+        </div>
+
+        {/* Order */}
+        <div>
+          <label className={labelCls}>Order <span className="text-gray-400 font-normal">(lower number appears first)</span></label>
+          <input
+            type="number"
+            value={order}
+            onChange={(e) => setOrder(parseInt(e.target.value) || 0)}
+            className={inputCls}
+            disabled={saving}
+          />
         </div>
 
         {/* Content */}

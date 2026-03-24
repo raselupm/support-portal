@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { name, product, categoryId, content } = await request.json()
+  const { name, product, categoryId, content, order } = await request.json()
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'Name is required.' }, { status: 400 })
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     categoryId,
     categoryName: category.name,
     content,
+    order: typeof order === 'number' ? order : 0,
     createdAt: now,
     updatedAt: now,
   }

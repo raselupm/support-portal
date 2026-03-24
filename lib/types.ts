@@ -67,6 +67,7 @@ export interface DocArticle {
   categoryId: string
   categoryName: string
   content: string // HTML from TipTap
+  order: number
   createdAt: string
   updatedAt: string
 }

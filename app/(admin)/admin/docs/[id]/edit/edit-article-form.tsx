@@ -26,6 +26,7 @@ export default function EditArticleForm({
   const [product, setProduct] = useState(article.product)
   const [categoryId, setCategoryId] = useState(article.categoryId)
   const [content, setContent] = useState(article.content)
+  const [order, setOrder] = useState(article.order ?? 0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -44,7 +45,7 @@ export default function EditArticleForm({
       const res = await fetch(`/api/admin/docs/articles/${article.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, product, categoryId, content }),
+        body: JSON.stringify({ name, product, categoryId, content, order }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to save article.'); return }
@@ -106,6 +107,18 @@ export default function EditArticleForm({
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* Order */}
+        <div>
+          <label className={labelCls}>Order <span className="text-gray-400 font-normal">(lower number appears first)</span></label>
+          <input
+            type="number"
+            value={order}
+            onChange={(e) => setOrder(parseInt(e.target.value) || 0)}
+            className={inputCls}
+            disabled={saving}
+          />
         </div>
 
         {/* Content */}

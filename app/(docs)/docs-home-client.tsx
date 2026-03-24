@@ -214,7 +214,7 @@ export default function DocsHomeClient({
   const categoryBoxes = categories.map((cat) => {
     const catArticles = articles.filter((a) => a.categoryId === cat.id)
     const oldest = [...catArticles].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
     ).slice(0, 5)
     return { category: cat, count: catArticles.length, articles: oldest }
   }).filter((box) => box.count > 0)

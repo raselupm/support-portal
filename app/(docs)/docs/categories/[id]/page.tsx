@@ -25,7 +25,9 @@ async function getData(id: string) {
     await Promise.all(allIds.map((aid) => redis.get<DocArticle>(`doc_article:${aid}`)))
   ).filter(Boolean) as DocArticle[]
 
-  const articles = allArticles.filter((a) => a.categoryId === id)
+  const articles = allArticles
+    .filter((a) => a.categoryId === id)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   return { category, articles }
 }
 
