@@ -654,6 +654,55 @@
     feedbackSection.appendChild(feedbackRow);
     container.appendChild(feedbackSection);
 
+    // ── Prev / Next navigation ──
+    if (article.prev || article.next) {
+      var navRow = el('div', { display: 'flex', gap: '8px', marginTop: '12px' });
+
+      if (article.prev) {
+        var prevId = article.prev.id;
+        var prevName = article.prev.name;
+        var prevBtn = el('button', {
+          flex: '1', padding: '10px 12px', borderRadius: '10px',
+          border: '1px solid ' + C.border, background: 'white',
+          cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s, background 0.15s',
+          minWidth: '0',
+        });
+        var prevLabel = el('div', { fontSize: '11px', color: C.textSecondary, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '3px' });
+        prevLabel.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Previous';
+        var prevTitle = el('div', { fontSize: '12px', fontWeight: '600', color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+        prevTitle.textContent = prevName;
+        prevBtn.appendChild(prevLabel);
+        prevBtn.appendChild(prevTitle);
+        prevBtn.addEventListener('mouseover', function () { prevBtn.style.borderColor = C.primary; prevBtn.style.background = '#f0f7ff'; });
+        prevBtn.addEventListener('mouseout',  function () { prevBtn.style.borderColor = C.border;  prevBtn.style.background = 'white'; });
+        prevBtn.addEventListener('click', function () { openArticle(prevId); });
+        navRow.appendChild(prevBtn);
+      }
+
+      if (article.next) {
+        var nextId = article.next.id;
+        var nextName = article.next.name;
+        var nextBtn = el('button', {
+          flex: '1', padding: '10px 12px', borderRadius: '10px',
+          border: '1px solid ' + C.border, background: 'white',
+          cursor: 'pointer', textAlign: 'right', transition: 'border-color 0.15s, background 0.15s',
+          minWidth: '0',
+        });
+        var nextLabel = el('div', { fontSize: '11px', color: C.textSecondary, marginBottom: '3px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' });
+        nextLabel.innerHTML = 'Next <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        var nextTitle = el('div', { fontSize: '12px', fontWeight: '600', color: C.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+        nextTitle.textContent = nextName;
+        nextBtn.appendChild(nextLabel);
+        nextBtn.appendChild(nextTitle);
+        nextBtn.addEventListener('mouseover', function () { nextBtn.style.borderColor = C.primary; nextBtn.style.background = '#f0f7ff'; });
+        nextBtn.addEventListener('mouseout',  function () { nextBtn.style.borderColor = C.border;  nextBtn.style.background = 'white'; });
+        nextBtn.addEventListener('click', function () { openArticle(nextId); });
+        navRow.appendChild(nextBtn);
+      }
+
+      container.appendChild(navRow);
+    }
+
     // Fetch current vote from server (cookie-backed)
     fetch(PORTAL_URL + '/api/docs/articles/' + encodeURIComponent(article.id) + '/feedback', {
       credentials: 'include',

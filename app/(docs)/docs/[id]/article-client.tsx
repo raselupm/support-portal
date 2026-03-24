@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { DocArticle } from '@/lib/types'
 import ArticleFeedback from '@/components/article-feedback'
 
@@ -152,10 +152,14 @@ export default function ArticleClient({
   article,
   groups,
   cta,
+  prev,
+  next,
 }: {
   article: DocArticle
   groups: ArticleGroup[]
   cta?: React.ReactNode
+  prev?: { id: string; name: string } | null
+  next?: { id: string; name: string } | null
 }) {
   const contentHtml = injectHeadingIds(article.content)
   const toc = buildToc(article.content)
@@ -204,6 +208,41 @@ export default function ArticleClient({
                 dangerouslySetInnerHTML={{ __html: contentHtml }}
               />
               <ArticleFeedback articleId={article.id} />
+
+              {(prev || next) && (
+                <div className="flex items-stretch gap-4 mt-8 pt-6 border-t border-gray-200">
+                  {prev ? (
+                    <Link
+                      href={`/docs/${prev.id}`}
+                      className="flex-1 flex flex-col gap-1 p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition group min-w-0"
+                    >
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        <ChevronLeft className="w-3 h-3" /> Previous
+                      </span>
+                      <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition truncate">
+                        {prev.name}
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex-1" />
+                  )}
+                  {next ? (
+                    <Link
+                      href={`/docs/${next.id}`}
+                      className="flex-1 flex flex-col items-end gap-1 p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition group min-w-0 text-right"
+                    >
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        Next <ChevronRight className="w-3 h-3" />
+                      </span>
+                      <span className="text-sm font-medium text-gray-700 group-hover:text-blue-600 transition truncate">
+                        {next.name}
+                      </span>
+                    </Link>
+                  ) : (
+                    <div className="flex-1" />
+                  )}
+                </div>
+              )}
             </div>
             {cta}
           </main>

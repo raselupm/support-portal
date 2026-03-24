@@ -12,6 +12,9 @@ export default function LogoutButton() {
     setLoading(true)
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
+      const bc = new BroadcastChannel('auth')
+      bc.postMessage({ type: 'logout' })
+      bc.close()
       router.push('/login')
     } catch {
       setLoading(false)

@@ -25,6 +25,11 @@ async function getData(id: string) {
     .filter((a) => a.product === article.product)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
+  const sameCategory = sameProduct.filter((a) => a.product === article.product && a.categoryId === article.categoryId)
+  const idx = sameCategory.findIndex((a) => a.id === id)
+  const prev = idx > 0 ? { id: sameCategory[idx - 1].id, name: sameCategory[idx - 1].name } : null
+  const next = idx < sameCategory.length - 1 ? { id: sameCategory[idx + 1].id, name: sameCategory[idx + 1].name } : null
+
   // Group by category
   const groupMap = new Map<string, ArticleGroup>()
   for (const a of sameProduct) {
@@ -34,7 +39,7 @@ async function getData(id: string) {
     groupMap.get(a.categoryId)!.articles.push({ id: a.id, name: a.name })
   }
 
-  return { article, groups: Array.from(groupMap.values()) }
+  return { article, groups: Array.from(groupMap.values()), prev, next }
 }
 
 export default async function ArticlePage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +52,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ id: st
   return (
     <>
       <DocsHeader appName={appName} wide />
-      <ArticleClient article={data.article} groups={data.groups} cta={<DocsCta />} />
+      <ArticleClient article={data.article} groups={data.groups} prev={data.prev} next={data.next} cta={<DocsCta />} />
     </>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface OnlineStatusContextValue {
   isOnline: boolean
@@ -18,6 +19,18 @@ export function useOnlineStatus() {
 
 export function OnlineStatusProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const bc = new BroadcastChannel('auth')
+    bc.onmessage = (e) => {
+      if (e.data?.type === 'logout') {
+        fetch('/api/admin/heartbeat', { method: 'DELETE' }).catch(() => {})
+        router.push('/login')
+      }
+    }
+    return () => bc.close()
+  }, [router])
 
   useEffect(() => {
     if (!isOnline) return
