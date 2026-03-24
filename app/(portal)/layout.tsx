@@ -1,4 +1,4 @@
-import Script from 'next/script'
+import ChatWidgetScript from '@/components/chat-widget-script'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isAdmin, isStaff } from '@/lib/auth'
@@ -19,8 +19,6 @@ export default async function PortalLayout({
   const admin = isAdmin(session.email)
   const staff = !admin && (await isStaff(session.email))
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Support Portal'
-  const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
   return (
     <>
       <div className="flex-1 bg-gray-50">
@@ -30,7 +28,7 @@ export default async function PortalLayout({
         </main>
       </div>
       {(admin || staff) && <TicketNotifier />}
-      <Script src={`${portalUrl}/chat-widget.js`} data-portal-url={portalUrl} strategy="afterInteractive" />
+      <ChatWidgetScript />
     </>
   )
 }

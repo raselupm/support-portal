@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ChevronDown } from 'lucide-react'
 import { DocArticle } from '@/lib/types'
+import ArticleFeedback from '@/components/article-feedback'
 
 type ArticleGroup = {
   categoryId: string
@@ -202,6 +203,7 @@ export default function ArticleClient({
                 className="prose prose-gray max-w-none"
                 dangerouslySetInnerHTML={{ __html: contentHtml }}
               />
+              <ArticleFeedback articleId={article.id} />
             </div>
             {cta}
           </main>

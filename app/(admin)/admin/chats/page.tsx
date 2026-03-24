@@ -34,7 +34,7 @@ export default async function ChatsPage() {
   const waitingCount = chats.filter((c) => c.status === 'waiting').length
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://your-domain.com'
-  const snippet = `<script src="${appUrl}/chat-widget.js" data-portal-url="${appUrl}"></script>`
+  const snippet = `<script src="${appUrl}/chat-widget.js" data-product="" data-color="#165dfc" data-portal-url="${appUrl}"></script>`
 
   return (
     <div className="space-y-6">

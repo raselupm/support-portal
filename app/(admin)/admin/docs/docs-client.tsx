@@ -1,14 +1,56 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { Pencil, Trash2, Plus } from 'lucide-react'
 import { DocArticle } from '@/lib/types'
 
+type FeedbackCounts = { happy: number; normal: number; sad: number }
+
+const FACE_SVGS = {
+  happy: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+      <circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  normal: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-500">
+      <circle cx="12" cy="12" r="10" /><line x1="8" y1="15" x2="16" y2="15" />
+      <circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  sad: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+      <circle cx="12" cy="12" r="10" /><path d="M8 17s1.5-2 4-2 4 2 4 2" />
+      <circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+}
+
 export default function DocsClient({ initialArticles }: { initialArticles: DocArticle[] }) {
   const [articles, setArticles] = useState<DocArticle[]>(initialArticles)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [feedbacks, setFeedbacks] = useState<Record<string, FeedbackCounts>>({})
+
+  useEffect(() => {
+    Promise.all(
+      initialArticles.map((a) =>
+        fetch(`/api/docs/articles/${a.id}/feedback`)
+          .then((r) => r.json())
+          .then((d) => ({ id: a.id, counts: { happy: d.happy, normal: d.normal, sad: d.sad } }))
+          .catch(() => ({ id: a.id, counts: { happy: 0, normal: 0, sad: 0 } }))
+      )
+    ).then((results) => {
+      const map: Record<string, FeedbackCounts> = {}
+      results.forEach(({ id, counts }) => { map[id] = counts })
+      setFeedbacks(map)
+    })
+  }, [initialArticles])
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this article? This cannot be undone.')) return
@@ -19,6 +61,21 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
     } finally {
       setDeleting(null)
     }
+  }
+
+  function FeedbackBadges({ id }: { id: string }) {
+    const f = feedbacks[id]
+    if (!f) return <span className="text-gray-300 text-xs">—</span>
+    return (
+      <div className="flex items-center gap-2">
+        {(['happy', 'normal', 'sad'] as const).map((k) => (
+          <span key={k} className="flex items-center gap-1">
+            {FACE_SVGS[k]}
+            <span className="text-xs text-gray-600">{f[k]}</span>
+          </span>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -61,6 +118,7 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                       <span>·</span>
                       <span>{formatDistanceToNow(new Date(article.createdAt), { addSuffix: true })}</span>
                     </div>
+                    <FeedbackBadges id={article.id} />
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Link
@@ -90,6 +148,7 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Product</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Category</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Feedback</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
                 </tr>
@@ -104,6 +163,9 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{article.categoryName}</td>
+                    <td className="px-4 py-3">
+                      <FeedbackBadges id={article.id} />
+                    </td>
                     <td className="px-4 py-3 text-gray-500">
                       {formatDistanceToNow(new Date(article.createdAt), { addSuffix: true })}
                     </td>

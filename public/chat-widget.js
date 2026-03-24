@@ -8,16 +8,57 @@
   })();
   var PORTAL_URL = (script.getAttribute('data-portal-url') || '').replace(/\/$/, '');
   if (!PORTAL_URL) return;
+  var PRODUCT_FILTER = script.getAttribute('data-product') || '';
 
   // Inject spin keyframes
   var styleEl = document.createElement('style');
   styleEl.textContent = '@keyframes sp-spin { to { transform: rotate(360deg); } } @keyframes sp-pulse { 0%,100%{opacity:1} 50%{opacity:.5} } @keyframes sp-bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-4px)} }';
   document.head.appendChild(styleEl);
 
+  // Color helpers
+  function hexToHsl(hex) {
+    var r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+    var max = Math.max(r,g,b), min = Math.min(r,g,b), h = 0, s = 0, l = (max+min)/2;
+    if (max !== min) {
+      var d = max - min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      if (max === r) h = ((g-b)/d + (g<b?6:0))/6;
+      else if (max === g) h = ((b-r)/d + 2)/6;
+      else h = ((r-g)/d + 4)/6;
+    }
+    return [h*360, s*100, l*100];
+  }
+  function hslToHex(h, s, l) {
+    h/=360; s/=100; l/=100;
+    var r,g,b;
+    if (s === 0) { r=g=b=l; }
+    else {
+      function hue2rgb(p,q,t) { if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; }
+      var q = l<0.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+      r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);
+    }
+    return '#'+[r,g,b].map(function(x){return ('0'+Math.round(x*255).toString(16)).slice(-2);}).join('');
+  }
+  function darkenColor(hex, pct) {
+    var hsl = hexToHsl(hex);
+    return hslToHex(hsl[0], hsl[1], Math.max(0, hsl[2] - pct));
+  }
+  function hexAlpha(hex, alpha) {
+    var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return 'rgba('+r+','+g+','+b+','+alpha+')';
+  }
+
   // Colors
+  var customColor = script.getAttribute('data-color') || '';
+  var primary = /^#[0-9a-fA-F]{6}$/.test(customColor) ? customColor : '#2563eb';
+  var isCustom = !!customColor;
   var C = {
-    primary: '#2563eb',
-    primaryHover: '#1d4ed8',
+    primary: primary,
+    primaryHover:      isCustom ? darkenColor(primary, 8)  : '#1d4ed8',
+    primaryDark:       isCustom ? darkenColor(primary, 15) : '#1d4ed8',
+    primaryDarker:     isCustom ? darkenColor(primary, 35) : '#1e3a8a',
+    primaryShadow:     hexAlpha(primary, 0.4),
+    primaryFocusShadow: hexAlpha(primary, 0.15),
     bg: '#ffffff',
     surface: '#f9fafb',
     border: '#e5e7eb',
@@ -129,6 +170,8 @@
   }
 
   // State
+  var WIN_W = 360, WIN_H = 500;
+
   var state = {
     step: 'button', // button | offline | email | message | waiting | active | closed
     chatId: localStorage.getItem('sp_chat_id') || null,
@@ -143,6 +186,7 @@
     staffSeenAt: null, // ISO string — when staff last read messages
     activeTab: 'home',  // 'home' | 'ask'
     homeView: 'browse', // 'browse' | 'article'
+    articleExpanded: false,
   };
 
   // ---- DOM helpers ----
@@ -168,7 +212,7 @@
     width: '52px', height: '52px', borderRadius: '50%',
     background: C.primary, border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(37,99,235,0.4)',
+    boxShadow: '0 4px 12px ' + C.primaryShadow,
     transition: 'background 0.2s', position: 'relative',
   });
   floatBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
@@ -214,10 +258,51 @@
   backBtn.addEventListener('mouseout',  function () { backBtn.style.background = 'none'; });
   backBtn.addEventListener('click', function () {
     state.homeView = 'browse';
+    state.articleExpanded = false;
+    collapseWin();
     winTitle.style.display = '';
     backBtn.style.display = 'none';
+    expandBtn.style.display = 'none';
+    closeWinBtn.style.display = '';
+    tabBar.style.display = 'flex';
     renderHome();
   });
+
+  // Maximize / restore button — shown only in article view
+  var expandBtn = el('button', Object.assign({}, btnStyle, { display: 'none' }));
+  expandBtn.title = 'Expand';
+  expandBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+  expandBtn.addEventListener('mouseover', function () { expandBtn.style.background = 'rgba(255,255,255,0.15)'; });
+  expandBtn.addEventListener('mouseout',  function () { expandBtn.style.background = 'none'; });
+  expandBtn.addEventListener('click', function () {
+    if (state.articleExpanded) {
+      state.articleExpanded = false;
+      collapseWin();
+      expandBtn.title = 'Expand';
+      expandBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+    } else {
+      state.articleExpanded = true;
+      expandWin();
+      expandBtn.title = 'Restore';
+      expandBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>';
+    }
+  });
+
+  function expandWin() {
+    var maxW = Math.floor(window.innerWidth * 0.9);
+    var maxH = Math.floor(window.innerHeight * 0.8);
+    var newW = Math.min(Math.round(WIN_W * 1.8), maxW);
+    var newH = Math.min(Math.round(WIN_H * 1.5), maxH);
+    win.style.width  = newW + 'px';
+    win.style.height = newH + 'px';
+    win.style.transition = 'width 0.25s ease, height 0.25s ease';
+  }
+
+  function collapseWin() {
+    win.style.width  = WIN_W + 'px';
+    win.style.height = WIN_H + 'px';
+    win.style.transition = 'width 0.25s ease, height 0.25s ease';
+  }
 
   var minimizeBtn = el('button', Object.assign({}, btnStyle, { display: 'none' }));
   minimizeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>';
@@ -237,6 +322,7 @@
 
   var headerBtns = el('div', { display: 'flex', alignItems: 'center', gap: '2px' });
   headerBtns.appendChild(minimizeBtn);
+  headerBtns.appendChild(expandBtn);
   headerBtns.appendChild(closeWinBtn);
   winHeader.appendChild(headerLeft);
   winHeader.appendChild(headerBtns);
@@ -265,8 +351,13 @@
     btn.appendChild(labelEl);
     btn.addEventListener('click', function () {
       state.homeView = 'browse';
+      state.articleExpanded = false;
+      collapseWin();
       winTitle.style.display = '';
       backBtn.style.display = 'none';
+      expandBtn.style.display = 'none';
+      closeWinBtn.style.display = '';
+      tabBar.style.display = 'flex';
       state.activeTab = tabName;
       updateTabBar();
       if (tabName === 'home') {
@@ -380,7 +471,7 @@
       var sp = el('div', { padding: '24px 16px', display: 'flex', justifyContent: 'center' });
       sp.innerHTML = '<div style="width:22px;height:22px;border:2px solid ' + C.border + ';border-top-color:' + C.primary + ';border-radius:50%;animation:sp-spin 0.8s linear infinite"></div>';
       listEl.appendChild(sp);
-      var url = PORTAL_URL + '/api/docs/articles?limit=10' + (q ? '&q=' + encodeURIComponent(q) : '');
+      var url = PORTAL_URL + '/api/docs/articles?limit=10' + (PRODUCT_FILTER ? '&product=' + encodeURIComponent(PRODUCT_FILTER) : '') + (q ? '&q=' + encodeURIComponent(q) : '');
       fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (articles) {
@@ -451,6 +542,7 @@
     while (winBody.firstChild) winBody.removeChild(winBody.firstChild);
     winTitle.style.display = 'none';
     backBtn.style.display = 'flex';
+    expandBtn.style.display = 'none'; // hide until article loaded
     var spinWrap = el('div', { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' });
     spinWrap.innerHTML = '<div style="width:32px;height:32px;border:3px solid ' + C.border + ';border-top-color:' + C.primary + ';border-radius:50%;animation:sp-spin 0.8s linear infinite"></div>';
     winBody.appendChild(spinWrap);
@@ -471,6 +563,12 @@
     state.homeView = 'article';
     winTitle.style.display = 'none';
     backBtn.style.display = 'flex';
+    closeWinBtn.style.display = 'none';
+    tabBar.style.display = 'none';
+    expandBtn.style.display = 'flex';
+    // Reset expand icon to collapsed state
+    expandBtn.title = 'Expand';
+    expandBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
     var container = el('div', { flex: '1', overflowY: 'auto', padding: '16px 18px 24px' });
     var titleEl = el('h2', {
@@ -481,11 +579,92 @@
 
     // Basic content styles via a <style> scoped to the content
     var styleTag = document.createElement('style');
-    styleTag.textContent = '.sp-article-content p{margin:0 0 10px} .sp-article-content h1,.sp-article-content h2,.sp-article-content h3{margin:16px 0 6px;font-weight:600} .sp-article-content ul,.sp-article-content ol{padding-left:20px;margin:0 0 10px} .sp-article-content pre{background:#f3f4f6;padding:10px;border-radius:6px;overflow-x:auto;font-size:12px} .sp-article-content code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}';
+    styleTag.textContent = '.sp-article-content p{margin:0 0 10px} .sp-article-content h1,.sp-article-content h2,.sp-article-content h3{margin:16px 0 6px;font-weight:600} .sp-article-content ul,.sp-article-content ol{padding-left:20px;margin:0 0 10px} .sp-article-content pre{background:#f3f4f6;padding:10px;border-radius:6px;overflow-x:auto;font-size:12px} .sp-article-content code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px} .sp-article-content figcaption{font-size:90%;color:#9ca3af;text-align:center;margin-top:4px}';
     contentEl.classList.add('sp-article-content');
 
     container.appendChild(titleEl);
     container.appendChild(contentEl);
+
+    // ── Feedback section ──
+    var REACTIONS = [
+      { key: 'happy',
+        svg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none"/></svg>' },
+      { key: 'normal',
+        svg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none"/></svg>' },
+      { key: 'sad',
+        svg: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 17s1.5-2 4-2 4 2 4 2"/><circle cx="9" cy="9.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9.5" r="1.5" fill="currentColor" stroke="none"/></svg>' },
+    ];
+
+    var feedbackState = { mine: null, loading: false };
+    var reactionBtns = {};
+
+    function renderReactionBtns() {
+      REACTIONS.forEach(function (r) {
+        var btn = reactionBtns[r.key];
+        var active = feedbackState.mine === r.key;
+        btn.style.background = active ? C.primaryDarker : C.primaryDark;
+        btn.style.opacity    = feedbackState.loading ? '0.6' : '1';
+      });
+    }
+
+    function doVote(reaction) {
+      if (feedbackState.loading) return;
+      feedbackState.loading = true;
+      renderReactionBtns();
+      fetch(PORTAL_URL + '/api/docs/articles/' + encodeURIComponent(article.id) + '/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction: reaction }),
+        credentials: 'include',
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          feedbackState.mine = data.mine;
+          feedbackState.loading = false;
+          renderReactionBtns();
+        })
+        .catch(function () { feedbackState.loading = false; renderReactionBtns(); });
+    }
+
+    var feedbackSection = el('div', {
+      marginTop: '20px', background: C.primary, borderRadius: '12px',
+      padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+    });
+    var feedbackLabel = el('p', {
+      fontSize: '13px', fontWeight: '500', color: 'white', margin: '0', flexShrink: '0',
+    }, { textContent: 'How did you feel?' });
+
+    var feedbackRow = el('div', { display: 'flex', gap: '8px', flexShrink: '0' });
+
+    REACTIONS.forEach(function (r) {
+      var btn = el('button', {
+        width: '36px', height: '36px', borderRadius: '50%',
+        background: C.primaryDark, border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'white', transition: 'background 0.15s',
+        flexShrink: '0',
+      });
+      btn.innerHTML = r.svg;
+      btn.addEventListener('click', function () { doVote(r.key); });
+      reactionBtns[r.key] = btn;
+      feedbackRow.appendChild(btn);
+    });
+
+    feedbackSection.appendChild(feedbackLabel);
+    feedbackSection.appendChild(feedbackRow);
+    container.appendChild(feedbackSection);
+
+    // Fetch current vote from server (cookie-backed)
+    fetch(PORTAL_URL + '/api/docs/articles/' + encodeURIComponent(article.id) + '/feedback', {
+      credentials: 'include',
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        feedbackState.mine = data.mine;
+        renderReactionBtns();
+      })
+      .catch(function () {});
+
     winBody.appendChild(container);
     if (!document.querySelector('style[data-sp-article]')) {
       styleTag.setAttribute('data-sp-article', '1');
@@ -606,7 +785,7 @@
 
     // Focus ring effects
     [nameInput, emailInput].forEach(function (inp) {
-      inp.addEventListener('focus', function () { inp.style.borderColor = C.primary; inp.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.15)'; });
+      inp.addEventListener('focus', function () { inp.style.borderColor = C.primary; inp.style.boxShadow = '0 0 0 3px ' + C.primaryFocusShadow; });
       inp.addEventListener('blur', function () { inp.style.borderColor = C.border; inp.style.boxShadow = 'none'; });
     });
 
