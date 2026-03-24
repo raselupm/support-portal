@@ -165,6 +165,7 @@ export default function TiptapEditor({
   ]
 
   function handleInsertImages(urls: string[]) {
+    if (!editor) return
     urls.forEach((url) => {
       editor.chain().focus().setImage({ src: url }).run()
     })
