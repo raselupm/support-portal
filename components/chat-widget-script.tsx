@@ -3,8 +3,8 @@ import Script from 'next/script'
 const portalUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 // ── Chat widget configuration ──────────────────────────────────────────────
-const WIDGET_COLOR   = '#ff6c39'   // data-color  — primary accent colour
-const WIDGET_PRODUCT = 'Product A'          // data-product — filter docs by product (leave empty for all)
+const WIDGET_COLOR   = '#165dfc'   // data-color  — primary accent colour
+const WIDGET_PRODUCT = ''          // data-product — filter docs by product (leave empty for all)
 // ──────────────────────────────────────────────────────────────────────────
 
 interface ChatWidgetScriptProps {
