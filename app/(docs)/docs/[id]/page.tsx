@@ -21,7 +21,9 @@ async function getData(id: string) {
     await Promise.all(allIds.map((aid) => redis.get<DocArticle>(`doc_article:${aid}`)))
   ).filter(Boolean) as DocArticle[]
 
-  const sameProduct = allArticles.filter((a) => a.product === article.product)
+  const sameProduct = allArticles
+    .filter((a) => a.product === article.product)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   // Group by category
   const groupMap = new Map<string, ArticleGroup>()
