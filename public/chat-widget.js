@@ -1481,6 +1481,19 @@
       .catch(function () { onError('Network error. Please try again.'); });
   }
 
+  // Merge API messages with any already received via Pusher new-message events.
+  // API result replaces the local 'init' placeholder; real Pusher messages
+  // (non-init, non-temp) that haven't reached the API yet are preserved.
+  function mergeMessages(apiMessages) {
+    var extras = state.messages.filter(function (m) {
+      if (m.id === 'init' || m.id.startsWith('temp-')) return false;
+      return !apiMessages.some(function (am) { return am.id === m.id; });
+    });
+    var merged = apiMessages.concat(extras);
+    merged.sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; });
+    return merged;
+  }
+
   // ---- Pusher real-time ----
   function subscribeChat(chatId) {
     if (state.pusherChannel) {
@@ -1554,7 +1567,7 @@
           fetch(PORTAL_URL + '/api/chat/' + chatId + '/messages?after=0&token=' + encodeURIComponent(state.token))
             .then(function (r) { return r.json(); })
             .then(function (allData) {
-              state.messages = allData.messages || [];
+              state.messages = mergeMessages(allData.messages || []);
               state.step = 'active';
               if (state.open) renderActive();
             });
@@ -1570,7 +1583,7 @@
           .then(function (allData) {
             if (!allData) return;
             if (allData.status === 'active' && state.step === 'waiting') {
-              state.messages = allData.messages || [];
+              state.messages = mergeMessages(allData.messages || []);
               state.step = 'active';
               if (state.open) renderActive();
             } else if (allData.status === 'closed' && state.step === 'waiting') {
