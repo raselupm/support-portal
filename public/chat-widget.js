@@ -956,6 +956,7 @@
 
   function renderActive() {
     clearBody();
+    state.activeTab = 'ask';
     state.unread = 0;
     badge.style.display = 'none';
     state.displayedIds = null; // reset so messages re-render into the new DOM
