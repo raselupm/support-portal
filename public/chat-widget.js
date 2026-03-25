@@ -1559,6 +1559,26 @@
             });
         }
       });
+
+      // Catch-up: events from the server (e.g. bot joining) may have fired before
+      // Pusher finished subscribing. Poll once immediately after subscribing so we
+      // never get stuck on the waiting screen.
+      if (state.step === 'waiting') {
+        fetch(PORTAL_URL + '/api/chat/' + chatId + '/messages?after=0&token=' + encodeURIComponent(state.token))
+          .then(function (r) { return r.json(); })
+          .then(function (allData) {
+            if (!allData) return;
+            if (allData.status === 'active' && state.step === 'waiting') {
+              state.messages = allData.messages || [];
+              state.step = 'active';
+              if (state.open) renderActive();
+            } else if (allData.status === 'closed' && state.step === 'waiting') {
+              state.step = 'closed';
+              if (state.open) renderClosed();
+            }
+          })
+          .catch(function () {});
+      }
     }
 
     if (state._pusherKey) {
