@@ -1154,8 +1154,8 @@
     typingRow.appendChild(typingDots);
 
     var _typingClearTimer = null;
-    function showTyping(name) {
-      typingText.textContent = name + ' is typing';
+    function showTyping(name, customText) {
+      typingText.textContent = customText || (name + ' is typing');
       typingRow.style.display = 'flex';
       if (_typingClearTimer) clearTimeout(_typingClearTimer);
       _typingClearTimer = setTimeout(function () {
@@ -1530,10 +1530,14 @@
       });
 
       state.pusherChannel.bind('typing', function (data) {
-        if (data.sender !== 'staff') return;
+        if (data.sender !== 'staff' && data.sender !== 'bot') return;
         if (state._suppressTypingUntil && Date.now() < state._suppressTypingUntil) return;
         if (state.step === 'active' && state.open && state._showTyping) {
-          state._showTyping(data.name);
+          if (data.sender === 'bot') {
+            state._showTyping(data.name, 'Bot is thinking...');
+          } else {
+            state._showTyping(data.name);
+          }
         }
       });
 

@@ -25,17 +25,23 @@ export async function POST(
     const staffName = staffRecord?.name || 'Support Staff'
     const now = new Date().toISOString()
 
-    const updatedChat: Chat = { ...chat, status: 'active', staffEmail, staffName, botActive: false, updatedAt: now }
+    const updatedChat: Chat = {
+      ...chat,
+      status: 'active',
+      staffEmail,
+      staffName,
+      botActive: false,
+      updatedAt: now,
+    }
     await redis.set(`chat:${id}`, JSON.stringify(updatedChat))
 
-    // System message
     const systemMessage: ChatMessage = {
       id: nanoid(10),
       chatId: id,
       sender: 'system',
       senderEmail: '',
       senderName: 'System',
-      content: `${staffName} has joined the chat.`,
+      content: `${staffName} has taken over from the bot.`,
       createdAt: now,
     }
     await redis.rpush(`chat_messages:${id}`, JSON.stringify(systemMessage))
@@ -48,7 +54,7 @@ export async function POST(
 
     return NextResponse.json({ chat: updatedChat })
   } catch (err) {
-    console.error('POST /api/chat/[id]/join error:', err)
-    return NextResponse.json({ error: 'Failed to join chat.' }, { status: 500 })
+    console.error('POST /api/chat/[id]/takeover error:', err)
+    return NextResponse.json({ error: 'Failed to take over chat.' }, { status: 500 })
   }
 }

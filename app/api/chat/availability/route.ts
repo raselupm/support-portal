@@ -1,4 +1,5 @@
 import { redis } from '@/lib/redis'
+import { getAiConfig } from '@/lib/ai'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,11 +13,14 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    // Find any live staff heartbeat keys (set by the admin panel, TTL 35s)
-    const keys = await redis.keys('staff_heartbeat:*')
-    const online = keys.length > 0
-    return Response.json({ online, count: keys.length }, { headers: corsHeaders })
+    const [keys, aiConfig] = await Promise.all([
+      redis.keys('staff_heartbeat:*'),
+      getAiConfig(),
+    ])
+    const botOnline = !!(aiConfig?.enabled)
+    const online = keys.length > 0 || botOnline
+    return Response.json({ online, count: keys.length, bot: botOnline }, { headers: corsHeaders })
   } catch {
-    return Response.json({ online: false, count: 0 }, { headers: corsHeaders })
+    return Response.json({ online: false, count: 0, bot: false }, { headers: corsHeaders })
   }
 }

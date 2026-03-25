@@ -41,8 +41,16 @@ export interface Chat {
   status: 'waiting' | 'active' | 'closed'
   staffEmail: string | null
   staffName: string | null
+  botActive?: boolean
   createdAt: string
   updatedAt: string
+}
+
+export interface AiConfig {
+  provider: 'anthropic' | 'openai' | 'gemini'
+  apiKey: string
+  model?: string
+  enabled: boolean
 }
 
 export interface ChatMeta {

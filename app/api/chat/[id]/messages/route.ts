@@ -5,6 +5,7 @@ import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { Chat, ChatMessage } from '@/lib/types'
 import { pusherServer, chatChannel, EVT_NEW_MESSAGE } from '@/lib/pusher'
+import { getAiConfig, generateBotReply, isBotHandoff } from '@/lib/ai'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,10 +133,62 @@ export async function POST(
       content: content.trim(), createdAt: now,
     }
 
-    await redis.rpush(`chat_messages:${id}`, JSON.stringify(message))
-    await redis.set(`chat:${id}`, JSON.stringify({ ...chat, updatedAt: now }))
+    // If a real human staff sends a message, disable the bot
+    const isHumanStaff = sender === 'staff' && senderEmail !== 'bot' && chat.botActive
+    const updatedChat = isHumanStaff
+      ? { ...chat, botActive: false, staffEmail: senderEmail, staffName: senderName, updatedAt: now }
+      : { ...chat, updatedAt: now }
 
-    after(pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, message))
+    await redis.rpush(`chat_messages:${id}`, JSON.stringify(message))
+    await redis.set(`chat:${id}`, JSON.stringify(updatedChat))
+
+    after(async () => {
+      await pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, message)
+
+      // Bot replies only to visitor messages when bot is still active
+      if (sender !== 'visitor' || !chat.botActive) return
+
+      const aiConfig = await getAiConfig()
+      if (!aiConfig?.enabled) return
+
+      // Re-fetch to make sure bot is still active (no race condition from takeover)
+      const freshChat = await redis.get<Chat>(`chat:${id}`)
+      if (!freshChat?.botActive) return
+
+      // Build conversation history for context
+      const allRaw = (await redis.lrange(`chat_messages:${id}`, 0, -1)) as string[]
+      const history = allRaw
+        .map((r) => { try { return typeof r === 'string' ? JSON.parse(r) : r } catch { return null } })
+        .filter(Boolean) as ChatMessage[]
+
+      const aiMessages = history
+        .filter((m) => m.sender === 'visitor' || (m.sender === 'staff' && m.senderEmail === 'bot'))
+        .map((m) => ({ role: (m.sender === 'visitor' ? 'user' : 'assistant') as 'user' | 'assistant', content: m.content }))
+
+      // Show "Bot is thinking..." and keep re-triggering every 2s while AI processes
+      await pusherServer.trigger(chatChannel(id), 'typing', { sender: 'bot', name: 'Support Bot' })
+      const typingInterval = setInterval(() => {
+        pusherServer.trigger(chatChannel(id), 'typing', { sender: 'bot', name: 'Support Bot' }).catch(() => {})
+      }, 2000)
+
+      const botReply = await generateBotReply(aiMessages, aiConfig)
+      clearInterval(typingInterval)
+      if (!botReply) return
+
+      const botMsgContent = isBotHandoff(botReply)
+        ? "I'm sorry, I couldn't find an answer in our documentation. Please open a support ticket and our team will get back to you."
+        : botReply
+
+      const botMsgTime = new Date().toISOString()
+      const botMessage: ChatMessage = {
+        id: nanoid(10), chatId: id, sender: 'staff', senderEmail: 'bot',
+        senderName: 'Support Bot', content: botMsgContent,
+        createdAt: botMsgTime,
+      }
+      await redis.rpush(`chat_messages:${id}`, JSON.stringify(botMessage))
+      await redis.set(`chat:${id}`, JSON.stringify({ ...freshChat, updatedAt: botMsgTime }))
+      await pusherServer.trigger(chatChannel(id), EVT_NEW_MESSAGE, botMessage)
+    })
 
     return NextResponse.json({ message }, { headers: corsHeaders })
   } catch (err) {

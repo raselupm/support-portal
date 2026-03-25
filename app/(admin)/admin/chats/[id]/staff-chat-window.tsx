@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi, Check, CheckCheck, Info } from 'lucide-react'
+import { ArrowLeft, Send, UserCheck, X, Globe, Monitor, Clock, MapPin, Wifi, Check, CheckCheck, Info, Bot } from 'lucide-react'
 import Pusher from 'pusher-js'
 import { Chat, ChatMessage, ChatMeta } from '@/lib/types'
 
@@ -160,6 +160,7 @@ export default function StaffChatWindow({
   const [sending, setSending] = useState(false)
   const [joining, setJoining] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [takingOver, setTakingOver] = useState(false)
   const [visitorTyping, setVisitorTyping] = useState<string | null>(null)
   const [visitorSeenAt, setVisitorSeenAt] = useState<string | undefined>(initialVisitorSeenAt)
   const [showInfo, setShowInfo] = useState(false)
@@ -219,12 +220,13 @@ export default function StaffChatWindow({
       }
     })
 
-    channel.bind('status-change', (data: { status: Chat['status']; staffEmail?: string; staffName?: string }) => {
+    channel.bind('status-change', (data: { status: Chat['status']; staffEmail?: string; staffName?: string; botActive?: boolean }) => {
       setChat((prev) => ({
         ...prev,
         status: data.status,
         staffEmail: data.staffEmail ?? prev.staffEmail,
         staffName: data.staffName ?? prev.staffName,
+        botActive: data.botActive ?? (data.staffEmail === 'bot' ? true : data.staffEmail ? false : prev.botActive),
       }))
       if (data.status === 'closed') {
         playCloseSound()
@@ -261,6 +263,19 @@ export default function StaffChatWindow({
       }
     } finally {
       setJoining(false)
+    }
+  }
+
+  const handleTakeOver = async () => {
+    setTakingOver(true)
+    try {
+      const res = await fetch(`/api/chat/${chat.id}/takeover`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setChat(data.chat)
+      }
+    } finally {
+      setTakingOver(false)
     }
   }
 
@@ -374,6 +389,11 @@ export default function StaffChatWindow({
           </div>
 
           <div className="flex items-center gap-2">
+            {chat.botActive && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                <Bot className="w-3 h-3" /> Bot active
+              </span>
+            )}
             {chat.status === 'waiting' && (
               <button
                 onClick={handleJoin}
@@ -383,6 +403,17 @@ export default function StaffChatWindow({
                 <UserCheck className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{joining ? 'Joining...' : 'Join Chat'}</span>
                 <span className="sm:hidden">{joining ? '...' : 'Join'}</span>
+              </button>
+            )}
+            {chat.botActive && chat.status === 'active' && (
+              <button
+                onClick={handleTakeOver}
+                disabled={takingOver}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{takingOver ? 'Taking over...' : 'Take Over'}</span>
+                <span className="sm:hidden">{takingOver ? '...' : 'Take Over'}</span>
               </button>
             )}
             {chat.status === 'active' && (
@@ -425,6 +456,7 @@ export default function StaffChatWindow({
               )
             }
             const isStaffMsg = msg.sender === 'staff'
+            const isBotMsg = msg.sender === 'staff' && msg.senderEmail === 'bot'
             const isSending = msg.id.startsWith('temp-')
             const isSeen = isStaffMsg && !isSending && !!visitorSeenAt && msg.createdAt <= visitorSeenAt
             const isDelivered = isStaffMsg && !isSending
@@ -434,6 +466,7 @@ export default function StaffChatWindow({
                 className={`flex flex-col gap-1 ${isStaffMsg ? 'items-end' : 'items-start'}`}
               >
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  {isBotMsg && <Bot className="w-3 h-3 text-purple-500" />}
                   <span className="font-medium">{msg.senderName}</span>
                   <span>·</span>
                   <span>
@@ -454,6 +487,8 @@ export default function StaffChatWindow({
                   className={`px-4 py-2.5 rounded-2xl text-sm max-w-[75%] whitespace-pre-wrap break-words ${
                     msg.failed
                       ? 'bg-red-50 text-red-700 border border-red-200'
+                      : isBotMsg
+                      ? 'bg-purple-600 text-white rounded-tr-sm'
                       : isStaffMsg
                       ? 'bg-blue-600 text-white rounded-tr-sm'
                       : 'bg-gray-100 text-gray-900 rounded-tl-sm'

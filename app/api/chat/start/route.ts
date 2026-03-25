@@ -2,7 +2,8 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { redis } from '@/lib/redis'
 import { nanoid } from 'nanoid'
 import { Chat, ChatMessage, ChatMeta } from '@/lib/types'
-import { pusherServer, CHATS_CHANNEL, EVT_NEW_CHAT } from '@/lib/pusher'
+import { pusherServer, CHATS_CHANNEL, EVT_NEW_CHAT, chatChannel, EVT_NEW_MESSAGE, EVT_STATUS_CHANGE, EVT_CHAT_UPDATED } from '@/lib/pusher'
+import { getAiConfig, generateBotReply, isBotHandoff } from '@/lib/ai'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -112,7 +113,65 @@ export async function POST(request: NextRequest) {
     // Track chat ID per IP for rate limiting
     await redis.sadd(`ip_chats:${ip}`, chatId)
 
-    after(pusherServer.trigger(CHATS_CHANNEL, EVT_NEW_CHAT, { chat, messageCount: 1 }))
+    after(async () => {
+      await pusherServer.trigger(CHATS_CHANNEL, EVT_NEW_CHAT, { chat, messageCount: 1 })
+
+      const aiConfig = await getAiConfig()
+      if (!aiConfig?.enabled) return
+
+      // Bot joins the chat
+      const botNow = new Date().toISOString()
+      const botChat: Chat = {
+        ...chat,
+        status: 'active',
+        staffEmail: 'bot',
+        staffName: 'Support Bot',
+        botActive: true,
+        updatedAt: botNow,
+      }
+      await redis.set(`chat:${chatId}`, JSON.stringify(botChat))
+
+      await Promise.all([
+        pusherServer.trigger(chatChannel(chatId), EVT_STATUS_CHANGE, {
+          status: 'active',
+          staffEmail: 'bot',
+          staffName: 'Support Bot',
+        }),
+        pusherServer.trigger(CHATS_CHANNEL, EVT_CHAT_UPDATED, botChat),
+      ])
+
+      // Show "Bot is thinking..." and keep re-triggering every 2s while AI processes
+      await pusherServer.trigger(chatChannel(chatId), 'typing', { sender: 'bot', name: 'Support Bot' })
+      const typingInterval = setInterval(() => {
+        pusherServer.trigger(chatChannel(chatId), 'typing', { sender: 'bot', name: 'Support Bot' }).catch(() => {})
+      }, 2000)
+
+      // Generate bot reply to the first visitor message
+      const botReply = await generateBotReply(
+        [{ role: 'user', content: message.trim() }],
+        aiConfig
+      )
+      clearInterval(typingInterval)
+      if (!botReply) return
+
+      const botMsgTime = new Date().toISOString()
+      const botMsgContent = isBotHandoff(botReply)
+        ? "I'm sorry, I couldn't find an answer in our documentation. Please open a support ticket and our team will get back to you."
+        : botReply
+
+      const botMessage: ChatMessage = {
+        id: nanoid(10),
+        chatId,
+        sender: 'staff',
+        senderEmail: 'bot',
+        senderName: 'Support Bot',
+        content: botMsgContent,
+        createdAt: botMsgTime,
+      }
+      await redis.rpush(`chat_messages:${chatId}`, JSON.stringify(botMessage))
+      await redis.set(`chat:${chatId}`, JSON.stringify({ ...botChat, updatedAt: botMsgTime }))
+      await pusherServer.trigger(chatChannel(chatId), EVT_NEW_MESSAGE, botMessage)
+    })
 
     return NextResponse.json(
       { chatId, token },

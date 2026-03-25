@@ -70,6 +70,18 @@ A full-featured customer support platform with ticket management, real-time live
 - **Delete** — hover an image to reveal a trash icon; confirm deletion inline
 - **Single-select** — one image selected at a time for insertion
 
+### AI Chat Bot
+- **Provider support** — configure Anthropic (Claude), OpenAI (GPT), or Google Gemini from the admin settings page
+- **Always online** — when the AI bot is enabled the chat widget shows as online even when no human staff is available
+- **Auto-join** — bot joins every new chat automatically and replies to the visitor's first message
+- **Documentation-grounded answers** — bot is strictly instructed to answer only from your knowledge base articles; it cannot make up information
+- **"Bot is thinking…" indicator** — a typing indicator appears in the chat widget while the AI is processing, re-triggered every 2 seconds so it never disappears mid-request
+- **Graceful fallback** — when the bot cannot find an answer it tells the visitor to open a support ticket instead of guessing
+- **Human takeover** — any staff member can click **Take Over** in the admin chat view to immediately disable the bot and handle the conversation themselves; a system message is posted to the chat
+- **Implicit takeover** — if a staff member sends a message directly the bot is silently disabled for that chat
+- **Visual distinction** — bot messages appear with a purple bubble and bot icon in the admin view (vs. blue for human staff); a "Bot active" badge shows in the chat header
+- **No extra dependencies** — all three provider APIs are called via native `fetch`; no SDK packages required
+
 ### Admin Panel
 - **Dashboard** — overview of tickets and activity
 - **Ticket management** — view all tickets, reply, update status, delete
@@ -78,6 +90,7 @@ A full-featured customer support platform with ticket management, real-time live
 - **Staff management** — create and manage support staff accounts (admin only)
 - **Docs management** — create and edit knowledge base articles with rich text editor, assign to categories; manage categories
   - Feedback counts column in the articles list showing happy / neutral / sad reaction totals
+- **Settings** — admin-only settings page for AI bot configuration (admin only)
 - **Real-time notifications** — sound + toast alert when a visitor requests chat or a customer replies to a ticket
 - **Waiting chat badge** — live count on Chats nav link via Pusher
 - **Header name link** — header shows display name (not email) and links to `/profile`
@@ -137,6 +150,7 @@ A full-featured customer support platform with ticket management, real-time live
 | Real-time | Pusher (Channels) |
 | Email | Nodemailer + Postmark (prod) / Mailtrap (dev) |
 | Rich text | Tiptap |
+| AI providers | Anthropic Claude / OpenAI GPT / Google Gemini (optional) |
 | Media storage | AWS S3 / DigitalOcean Spaces / Cloudinary (optional) |
 | Background tasks | `after()` from `next/server` (Next.js 15 native) |
 | PWA | Web App Manifest + Service Worker (Workbox-free, hand-rolled) |
@@ -268,6 +282,52 @@ Open [http://localhost:3000](http://localhost:3000).
 2. Click **Add Staff** and enter the staff member's email and name
 3. They can log in at `/login` and access the staff panel
 
+### Setting Up the AI Chat Bot
+
+The AI bot is optional. When configured it answers visitor chats automatically using only your knowledge base articles as context.
+
+**Step 1 — Add articles to your knowledge base**
+
+The bot can only answer from content in your docs (`/admin/docs`). Add articles before enabling the bot so it has something to reference.
+
+**Step 2 — Get an API key from your chosen provider**
+
+| Provider | Where to get a key | Recommended model |
+|---|---|---|
+| Anthropic | [console.anthropic.com](https://console.anthropic.com) | `claude-haiku-4-5-20251001` |
+| OpenAI | [platform.openai.com](https://platform.openai.com) | `gpt-4o-mini` |
+| Google Gemini | [aistudio.google.com](https://aistudio.google.com) | `gemini-1.5-flash` |
+
+**Step 3 — Configure in the admin panel**
+
+1. Go to **Admin Panel → Settings** (admin account required)
+2. Select your provider
+3. Paste your API key
+4. Optionally enter a specific model name (leave blank to use the default)
+5. Make sure the **Enable AI bot** toggle is on
+6. Click **Save Configuration**
+
+The bot is now active. The chat widget will show as online and the bot will join new chats automatically.
+
+**Switching providers**
+
+Select a different provider, enter the new API key, and save. The old key is replaced immediately.
+
+**Disabling the bot**
+
+Toggle **Enable AI bot** off and save — or click **Remove** to delete the configuration entirely. Human staff online status is restored.
+
+**How the bot behaves**
+
+- Joins every new chat immediately and replies to the visitor's opening message
+- Answers follow-up messages using your docs as the only source of truth
+- Shows a **"Bot is thinking…"** typing indicator while the AI processes each request
+- If it cannot find an answer it tells the visitor to open a support ticket
+- Any staff member can click **Take Over** in the chat view to handle the conversation; the bot stops responding for that chat
+- If a staff member sends a message directly the bot is silently disabled for that chat
+
+---
+
 ### Embedding the Chat Widget
 
 Add this snippet before `</body>` on any webpage:
@@ -321,6 +381,7 @@ lib/
 ├── pusher.ts        # Pusher server client + event constants
 ├── email.ts         # Nodemailer helpers (OTP, new ticket, reply notification)
 ├── storage.ts       # Media storage abstraction (AWS S3 / DO Spaces / Cloudinary)
+├── ai.ts            # AI bot: provider abstraction (Anthropic / OpenAI / Gemini), doc context loader, handoff detection
 └── types.ts         # Shared TypeScript types
 components/
 ├── tiptap-editor.tsx       # Rich text editor with heading + image toolbar
