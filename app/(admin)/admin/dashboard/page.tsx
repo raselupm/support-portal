@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { Ticket, StaffMember, Chat, DocArticle, DocCategory } from '@/lib/types'
+import { Ticket, StaffMember, Chat, DocArticle, DocProduct } from '@/lib/types'
 import { formatDistanceToNow } from 'date-fns'
 import { TicketIcon, MessageSquare, CheckCircle, LayoutDashboard, MessagesSquare, Clock, ActivitySquare, XCircle, BookOpen, FolderOpen } from 'lucide-react'
 import Link from 'next/link'
@@ -124,11 +124,11 @@ export default async function DashboardPage() {
   }
 
   // 6. Docs counts + recent 5 articles
-  const [allArticleIds, allCategoryIds] = await Promise.all([
+  const [allArticleIds, allProductIds] = await Promise.all([
     redis.zrange('doc_articles', 0, -1) as Promise<string[]>,
-    redis.zrange('doc_categories', 0, -1) as Promise<string[]>,
+    redis.zrange('doc_products', 0, -1) as Promise<string[]>,
   ])
-  const docCounts = { articles: allArticleIds.length, categories: allCategoryIds.length }
+  const docCounts = { articles: allArticleIds.length, products: allProductIds.length }
 
   const recentArticleIds = (await redis.zrange('doc_articles', 0, 4, { rev: true })) as string[]
   const recentArticles = (
@@ -215,8 +215,8 @@ export default async function DashboardPage() {
               colorClass="bg-indigo-50"
           />
           <StatCard
-              label="Categories"
-              value={docCounts.categories}
+              label="Products"
+              value={docCounts.products}
               icon={<FolderOpen className="w-5 h-5 text-violet-600" />}
               colorClass="bg-violet-50"
           />
@@ -331,7 +331,7 @@ export default async function DashboardPage() {
                       {article.name}
                     </Link>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-400">{article.categoryName}</span>
+                      <span className="text-xs text-gray-400">{article.productName}</span>
                       <span className="text-xs text-gray-300">·</span>
                       <span className="text-xs text-gray-400">
                         {formatDistanceToNow(new Date(article.updatedAt), { addSuffix: true })}

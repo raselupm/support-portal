@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { DocArticle, DocCategory } from '@/lib/types'
+import { DocArticle, DocProduct } from '@/lib/types'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -27,32 +27,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const existing = await redis.get<DocArticle>(`doc_article:${id}`)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { name, product, categoryId, content, order } = await request.json()
+  const { name, productId, content, order } = await request.json()
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'Name is required.' }, { status: 400 })
   }
-  if (!product || typeof product !== 'string' || !product.trim()) {
+  if (!productId || typeof productId !== 'string') {
     return NextResponse.json({ error: 'Product is required.' }, { status: 400 })
-  }
-  if (!categoryId || typeof categoryId !== 'string') {
-    return NextResponse.json({ error: 'Category is required.' }, { status: 400 })
   }
   if (!content || typeof content !== 'string') {
     return NextResponse.json({ error: 'Content is required.' }, { status: 400 })
   }
 
-  const category = await redis.get<DocCategory>(`doc_category:${categoryId}`)
-  if (!category) {
-    return NextResponse.json({ error: 'Category not found.' }, { status: 400 })
+  const product = await redis.get<DocProduct>(`doc_product:${productId}`)
+  if (!product) {
+    return NextResponse.json({ error: 'Product not found.' }, { status: 400 })
   }
 
   const updated: DocArticle = {
     ...existing,
     name: name.trim(),
-    product: product.trim(),
-    categoryId,
-    categoryName: category.name,
+    productId,
+    productName: product.name,
     content,
     order: typeof order === 'number' ? order : (existing.order ?? 0),
     updatedAt: new Date().toISOString(),

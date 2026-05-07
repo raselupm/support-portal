@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { BookOpen, Search, X, FileText, ChevronRight } from 'lucide-react'
-import { DocArticle, DocCategory } from '@/lib/types'
+import { DocArticle, DocProduct } from '@/lib/types'
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
@@ -12,15 +12,15 @@ function stripHtml(html: string) {
 // ── Search Popup ────────────────────────────────────────────────────────────
 function SearchPopup({
   articles,
-  categories,
+  products,
   onClose,
 }: {
   articles: DocArticle[]
-  categories: DocCategory[]
+  products: DocProduct[]
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -31,7 +31,7 @@ function SearchPopup({
   }, [onClose])
 
   const filtered = articles.filter((a) => {
-    const matchesCategory = !selectedCategory || a.categoryId === selectedCategory
+    const matchesCategory = !selectedProduct || a.productId === selectedProduct
     if (!query.trim()) return matchesCategory
     const q = query.toLowerCase()
     return matchesCategory && (
@@ -40,7 +40,7 @@ function SearchPopup({
     )
   }).slice(0, 10)
 
-  const displayArticles = query.trim() || selectedCategory ? filtered : articles.slice(0, 5)
+  const displayArticles = query.trim() || selectedProduct ? filtered : articles.slice(0, 5)
 
   return (
     <div
@@ -69,15 +69,15 @@ function SearchPopup({
               </button>
             )}
           </div>
-          {/* Category filter */}
+          {/* Product filter */}
           <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
+            value={selectedProduct}
+            onChange={(e) => setSelectedProduct(e.target.value)}
             className="text-sm border border-gray-200 rounded-xl px-3 py-2 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            <option value="">All products</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
           <button
@@ -108,7 +108,7 @@ function SearchPopup({
                         {article.name}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{article.categoryName}</span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">{article.productName}</span>
                   </Link>
                 </li>
               ))}
@@ -116,7 +116,7 @@ function SearchPopup({
           )}
         </div>
 
-        {!query && !selectedCategory && (
+        {!query && !selectedProduct && (
           <div className="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
             Showing {displayArticles.length} most recent articles
           </div>
@@ -199,24 +199,24 @@ function HeroCanvas() {
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function DocsHomeClient({
   articles,
-  categories,
+  products,
   appName,
   cta,
 }: {
   articles: DocArticle[]
-  categories: DocCategory[]
+  products: DocProduct[]
   appName: string
   cta?: React.ReactNode
 }) {
   const [searchOpen, setSearchOpen] = useState(false)
 
-  // Build category boxes: for each category, get article count + 5 oldest articles
-  const categoryBoxes = categories.map((cat) => {
-    const catArticles = articles.filter((a) => a.categoryId === cat.id)
-    const oldest = [...catArticles].sort(
+  // Build product boxes: for each product, get article count + 5 ordered articles
+  const productBoxes = products.map((prod) => {
+    const prodArticles = articles.filter((a) => a.productId === prod.id)
+    const ordered = [...prodArticles].sort(
       (a, b) => (a.order ?? 0) - (b.order ?? 0)
     ).slice(0, 5)
-    return { category: cat, count: catArticles.length, articles: oldest }
+    return { product: prod, count: prodArticles.length, articles: ordered }
   }).filter((box) => box.count > 0)
 
   return (
@@ -224,7 +224,7 @@ export default function DocsHomeClient({
       {searchOpen && (
         <SearchPopup
           articles={articles}
-          categories={categories}
+          products={products}
           onClose={() => setSearchOpen(false)}
         />
       )}
@@ -260,7 +260,7 @@ export default function DocsHomeClient({
 
         {/* Main content */}
         <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {categoryBoxes.length === 0 ? (
+          {productBoxes.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
               <BookOpen className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-lg font-medium">No documentation yet</p>
@@ -268,15 +268,15 @@ export default function DocsHomeClient({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categoryBoxes.map(({ category, count, articles: boxArticles }) => (
+              {productBoxes.map(({ product, count, articles: boxArticles }) => (
                 <div
-                  key={category.id}
+                  key={product.id}
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col"
                 >
                   {/* Box header */}
                   <div className="px-5 pt-5 pb-4 border-b border-gray-100">
                     <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-gray-900 text-base">{category.name}</h2>
+                      <h2 className="font-semibold text-gray-900 text-base">{product.name}</h2>
                       <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700">
                         {count}
                       </span>
@@ -301,29 +301,16 @@ export default function DocsHomeClient({
                     ))}
                   </ul>
 
-                  {/* Explore more */}
-                  {count > 5 && (
-                    <div className="px-5 py-3 border-t border-gray-100">
-                      <Link
-                        href={`/docs/categories/${category.id}`}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition"
-                      >
-                        Explore more
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  )}
-                  {count <= 5 && (
-                    <div className="px-5 py-3 border-t border-gray-100">
-                      <Link
-                        href={`/docs/categories/${category.id}`}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition"
-                      >
-                        View category
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </div>
-                  )}
+                  {/* View product */}
+                  <div className="px-5 py-3 border-t border-gray-100">
+                    <Link
+                      href={`/docs/products/${product.id}`}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 transition"
+                    >
+                      {count > 5 ? 'Explore more' : 'View product'}
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>

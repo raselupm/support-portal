@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
-import { DocArticle, DocCategory } from '@/lib/types'
+import { DocArticle, DocProduct } from '@/lib/types'
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap-editor'), { ssr: false })
 
@@ -14,17 +14,14 @@ const inputCls =
 
 export default function EditArticleForm({
   article,
-  categories,
   products,
 }: {
   article: DocArticle
-  categories: DocCategory[]
-  products: string[]
+  products: DocProduct[]
 }) {
   const router = useRouter()
   const [name, setName] = useState(article.name)
-  const [product, setProduct] = useState(article.product)
-  const [categoryId, setCategoryId] = useState(article.categoryId)
+  const [productId, setProductId] = useState(article.productId)
   const [content, setContent] = useState(article.content)
   const [order, setOrder] = useState(article.order ?? 0)
   const [saving, setSaving] = useState(false)
@@ -35,8 +32,7 @@ export default function EditArticleForm({
     setError('')
 
     if (!name.trim()) { setError('Name is required.'); return }
-    if (!product) { setError('Product is required.'); return }
-    if (!categoryId) { setError('Please select a category.'); return }
+    if (!productId) { setError('Please select a product.'); return }
     const text = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
     if (!text) { setError('Content is required.'); return }
 
@@ -45,7 +41,7 @@ export default function EditArticleForm({
       const res = await fetch(`/api/admin/docs/articles/${article.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, product, categoryId, content, order }),
+        body: JSON.stringify({ name, productId, content, order }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to save article.'); return }
@@ -76,35 +72,20 @@ export default function EditArticleForm({
 
         {/* Product */}
         <div>
-          <label className={labelCls}>Product</label>
-          <select
-            value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            className={inputCls}
-            disabled={saving}
-          >
-            {products.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Category */}
-        <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-sm font-medium text-gray-700">Category</label>
-            <a href="/admin/docs/categories" target="_blank" className="text-xs text-blue-600 hover:underline">
-              Manage categories
+            <label className="block text-sm font-medium text-gray-700">Product</label>
+            <a href="/admin/docs/products" target="_blank" className="text-xs text-blue-600 hover:underline">
+              Manage products
             </a>
           </div>
           <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
             className={inputCls}
             disabled={saving}
           >
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            {products.map((prod) => (
+              <option key={prod.id} value={prod.id}>{prod.name}</option>
             ))}
           </select>
         </div>

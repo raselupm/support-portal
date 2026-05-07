@@ -16,7 +16,7 @@ export async function GET(
   ).filter(Boolean) as DocArticle[]
 
   const siblings = allArticles
-    .filter((a) => a.product === article.product && a.categoryId === article.categoryId)
+    .filter((a) => a.productId === article.productId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   const idx = siblings.findIndex((a) => a.id === id)

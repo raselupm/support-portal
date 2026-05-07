@@ -2,20 +2,20 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { DocCategory } from '@/lib/types'
+import { DocProduct } from '@/lib/types'
 import { BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import NewArticleForm from './new-article-form'
 
-async function getCategories(): Promise<DocCategory[]> {
-  const ids = (await redis.zrange('doc_categories', 0, -1, { rev: true })) as string[]
+async function getProducts(): Promise<DocProduct[]> {
+  const ids = (await redis.zrange('doc_products', 0, -1, { rev: true })) as string[]
   if (ids.length === 0) return []
-  const categories: DocCategory[] = []
+  const products: DocProduct[] = []
   for (const id of ids) {
-    const cat = await redis.get<DocCategory>(`doc_category:${id}`)
-    if (cat) categories.push(cat)
+    const prod = await redis.get<DocProduct>(`doc_product:${id}`)
+    if (prod) products.push(prod)
   }
-  return categories
+  return products
 }
 
 export default async function NewArticlePage() {
@@ -23,11 +23,7 @@ export default async function NewArticlePage() {
   if (!session.email) redirect('/login')
   if (!(await isStaff(session.email))) redirect('/tickets')
 
-  const categories = await getCategories()
-  const products = (process.env.PRODUCTS || 'Product A,Product B,Product C')
-    .split(',')
-    .map((p) => p.trim())
-    .filter(Boolean)
+  const products = await getProducts()
 
   return (
     <div className="space-y-6">
@@ -43,7 +39,7 @@ export default async function NewArticlePage() {
           </div>
         </div>
       </div>
-      <NewArticleForm categories={categories} products={products} />
+      <NewArticleForm products={products} />
     </div>
   )
 }

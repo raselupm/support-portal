@@ -16,7 +16,7 @@ async function getDocsContext(): Promise<string> {
   const text = articles
     .map((a) => {
       const plain = a.content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
-      return `## ${a.name}\nProduct: ${a.product} | Category: ${a.categoryName}\n${plain}`
+      return `## ${a.name}\nProduct: ${a.productName}\n${plain}`
     })
     .join('\n\n---\n\n')
 

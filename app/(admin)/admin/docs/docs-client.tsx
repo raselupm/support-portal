@@ -83,10 +83,10 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/admin/docs/categories"
+            href="/admin/docs/products"
             className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
           >
-            Manage categories
+            Manage products
           </Link>
         </div>
         <Link
@@ -113,8 +113,7 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                   <div className="flex-1 min-w-0 space-y-1">
                     <p className="font-medium text-gray-900 text-sm truncate">{article.name}</p>
                     <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
-                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">{article.product}</span>
-                      <span>{article.categoryName}</span>
+                      <span className="bg-gray-100 px-2 py-0.5 rounded-full">{article.productName}</span>
                       <span>·</span>
                       <span>{formatDistanceToNow(new Date(article.createdAt), { addSuffix: true })}</span>
                     </div>
@@ -147,7 +146,6 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Product</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Category</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Feedback</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Date</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -159,10 +157,9 @@ export default function DocsClient({ initialArticles }: { initialArticles: DocAr
                     <td className="px-4 py-3 font-medium text-gray-900">{article.name}</td>
                     <td className="px-4 py-3">
                       <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs">
-                        {article.product}
+                        {article.productName}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{article.categoryName}</td>
                     <td className="px-4 py-3">
                       <FeedbackBadges id={article.id} />
                     </td>

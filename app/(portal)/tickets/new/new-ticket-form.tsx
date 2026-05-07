@@ -1,15 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import TiptapEditor from '@/components/tiptap-editor'
-
-const PRODUCTS = (process.env.NEXT_PUBLIC_PRODUCTS || process.env.PRODUCTS || 'Product A,Product B,Product C')
-  .split(',')
-  .map((p) => p.trim())
-  .filter(Boolean)
 
 const MIN_TITLE = 10
 const MAX_TITLE = 120
@@ -21,7 +16,20 @@ function stripHtml(html: string): string {
 
 export default function NewTicketPage() {
   const router = useRouter()
-  const [product, setProduct] = useState(PRODUCTS[0] || '')
+  const [products, setProducts] = useState<{ id: string; name: string }[]>([])
+  const [product, setProduct] = useState('')
+
+  useEffect(() => {
+    fetch('/api/docs/products')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setProducts(data)
+          setProduct(data[0].name)
+        }
+      })
+      .catch(() => {})
+  }, [])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
@@ -38,7 +46,7 @@ export default function NewTicketPage() {
     setTouched({ title: true, description: true })
 
     if (!product) {
-      setError('Please select a product.')
+      setError('Please select a category.')
       return
     }
     if (!title.trim()) {
@@ -103,7 +111,7 @@ export default function NewTicketPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="product" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Product
+              Category
             </label>
             <select
               id="product"
@@ -112,9 +120,9 @@ export default function NewTicketPage() {
               disabled={loading}
               className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-sm"
             >
-              {PRODUCTS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+              {products.map((p) => (
+                <option key={p.id} value={p.name}>
+                  {p.name}
                 </option>
               ))}
             </select>

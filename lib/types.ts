@@ -62,7 +62,7 @@ export interface ChatMeta {
   language?: string
 }
 
-export interface DocCategory {
+export interface DocProduct {
   id: string
   name: string
   createdAt: string
@@ -71,9 +71,8 @@ export interface DocCategory {
 export interface DocArticle {
   id: string
   name: string
-  product: string
-  categoryId: string
-  categoryName: string
+  productId: string
+  productName: string
   content: string // HTML from TipTap
   order: number
   createdAt: string

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Loader2 } from 'lucide-react'
-import { DocCategory } from '@/lib/types'
+import { DocProduct } from '@/lib/types'
 
 const TiptapEditor = dynamic(() => import('@/components/tiptap-editor'), { ssr: false })
 
@@ -13,16 +13,13 @@ const inputCls =
   'w-full px-4 py-2.5 rounded-lg border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition'
 
 export default function NewArticleForm({
-  categories,
   products,
 }: {
-  categories: DocCategory[]
-  products: string[]
+  products: DocProduct[]
 }) {
   const router = useRouter()
   const [name, setName] = useState('')
-  const [product, setProduct] = useState(products[0] || '')
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || '')
+  const [productId, setProductId] = useState(products[0]?.id || '')
   const [content, setContent] = useState('')
   const [order, setOrder] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -33,8 +30,7 @@ export default function NewArticleForm({
     setError('')
 
     if (!name.trim()) { setError('Name is required.'); return }
-    if (!product) { setError('Product is required.'); return }
-    if (!categoryId) { setError('Please select a category.'); return }
+    if (!productId) { setError('Please select a product.'); return }
     const text = content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
     if (!text) { setError('Content is required.'); return }
 
@@ -43,7 +39,7 @@ export default function NewArticleForm({
       const res = await fetch('/api/admin/docs/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, product, categoryId, content, order }),
+        body: JSON.stringify({ name, productId, content, order }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to save article.'); return }
@@ -74,43 +70,28 @@ export default function NewArticleForm({
 
         {/* Product */}
         <div>
-          <label className={labelCls}>Product</label>
-          <select
-            value={product}
-            onChange={(e) => setProduct(e.target.value)}
-            className={inputCls}
-            disabled={saving}
-          >
-            {products.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Category */}
-        <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-sm font-medium text-gray-700">Category</label>
-            <a href="/admin/docs/categories" target="_blank" className="text-xs text-blue-600 hover:underline">
-              Manage categories
+            <label className="block text-sm font-medium text-gray-700">Product</label>
+            <a href="/admin/docs/products" target="_blank" className="text-xs text-blue-600 hover:underline">
+              Manage products
             </a>
           </div>
-          {categories.length === 0 ? (
+          {products.length === 0 ? (
             <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
-              No categories yet.{' '}
-              <a href="/admin/docs/categories" target="_blank" className="underline font-medium">
+              No products yet.{' '}
+              <a href="/admin/docs/products" target="_blank" className="underline font-medium">
                 Add one first.
               </a>
             </p>
           ) : (
             <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
               className={inputCls}
               disabled={saving}
             >
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              {products.map((prod) => (
+                <option key={prod.id} value={prod.id}>{prod.name}</option>
               ))}
             </select>
           )}
@@ -142,7 +123,7 @@ export default function NewArticleForm({
       <div className="flex items-center gap-3">
         <button
           type="submit"
-          disabled={saving || categories.length === 0}
+          disabled={saving || products.length === 0}
           className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium px-5 py-2.5 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}

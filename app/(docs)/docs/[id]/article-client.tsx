@@ -7,8 +7,8 @@ import { DocArticle } from '@/lib/types'
 import ArticleFeedback from '@/components/article-feedback'
 
 type ArticleGroup = {
-  categoryId: string
-  categoryName: string
+  productId: string
+  productName: string
   articles: { id: string; name: string }[]
 }
 
@@ -41,13 +41,13 @@ function injectHeadingIds(html: string): string {
 function SidebarAccordion({
   groups,
   currentArticleId,
-  currentCategoryId,
+  currentProductId,
 }: {
   groups: ArticleGroup[]
   currentArticleId: string
-  currentCategoryId: string
+  currentProductId: string
 }) {
-  const [open, setOpen] = useState<Set<string>>(new Set([currentCategoryId]))
+  const [open, setOpen] = useState<Set<string>>(new Set([currentProductId]))
 
   function toggle(id: string) {
     setOpen((prev) => {
@@ -60,14 +60,14 @@ function SidebarAccordion({
   return (
     <nav className="space-y-1">
       {groups.map((group) => {
-        const isOpen = open.has(group.categoryId)
+        const isOpen = open.has(group.productId)
         return (
-          <div key={group.categoryId} className="border border-gray-200 rounded-lg overflow-hidden">
+          <div key={group.productId} className="border border-gray-200 rounded-lg overflow-hidden">
             <button
-              onClick={() => toggle(group.categoryId)}
+              onClick={() => toggle(group.productId)}
               className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition text-left"
             >
-              <span className="text-sm font-medium text-gray-700">{group.categoryName}</span>
+              <span className="text-sm font-medium text-gray-700">{group.productName}</span>
               <ChevronDown
                 className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
               />
@@ -168,16 +168,13 @@ export default function ArticleClient({
     <div className="flex-1 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex gap-8">
-          {/* Left sidebar — category accordion */}
+          {/* Left sidebar — product accordion */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">
-                {article.product}
-              </p>
               <SidebarAccordion
                 groups={groups}
                 currentArticleId={article.id}
-                currentCategoryId={article.categoryId}
+                currentProductId={article.productId}
               />
             </div>
           </aside>
@@ -189,8 +186,8 @@ export default function ArticleClient({
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-6">
                 <Link href="/" className="hover:text-gray-600 transition">Docs</Link>
                 <span>/</span>
-                <Link href={`/docs/categories/${article.categoryId}`} className="hover:text-gray-600 transition">
-                  {article.categoryName}
+                <Link href={`/docs/products/${article.productId}`} className="hover:text-gray-600 transition">
+                  {article.productName}
                 </Link>
                 <span>/</span>
                 <span className="text-gray-600">{article.name}</span>
@@ -198,9 +195,7 @@ export default function ArticleClient({
 
               <h1 className="text-2xl font-bold text-gray-900 mb-2">{article.name}</h1>
               <div className="flex items-center gap-2 mb-8">
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{article.product}</span>
-                <span className="text-xs text-gray-400">·</span>
-                <span className="text-xs text-gray-400">{article.categoryName}</span>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{article.productName}</span>
               </div>
 
               <div

@@ -1,11 +1,11 @@
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { isStaff } from '@/lib/auth'
 import { redis } from '@/lib/redis'
-import { DocArticle, DocProduct } from '@/lib/types'
-import { BookOpen } from 'lucide-react'
+import { DocProduct } from '@/lib/types'
+import { Tag } from 'lucide-react'
 import Link from 'next/link'
-import EditArticleForm from './edit-article-form'
+import ProductsClient from './products-client'
 
 async function getProducts(): Promise<DocProduct[]> {
   const ids = (await redis.zrange('doc_products', 0, -1, { rev: true })) as string[]
@@ -18,30 +18,26 @@ async function getProducts(): Promise<DocProduct[]> {
   return products
 }
 
-export default async function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductsPage() {
   const session = await getSession()
   if (!session.email) redirect('/login')
   if (!(await isStaff(session.email))) redirect('/tickets')
-
-  const { id } = await params
-  const article = await redis.get<DocArticle>(`doc_article:${id}`)
-  if (!article) notFound()
 
   const products = await getProducts()
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <BookOpen className="w-5 h-5 text-gray-700" />
+        <Tag className="w-5 h-5 text-gray-700" />
         <div className="flex items-center gap-2">
           <Link href="/admin/docs" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
             Docs
           </Link>
           <span className="text-gray-300">/</span>
-          <h1 className="text-xl font-bold text-gray-900">Edit Article</h1>
+          <h1 className="text-xl font-bold text-gray-900">Products</h1>
         </div>
       </div>
-      <EditArticleForm article={article} products={products} />
+      <ProductsClient initialProducts={products} />
     </div>
   )
 }
